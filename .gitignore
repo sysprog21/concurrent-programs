@@ -1,0 +1,6 @@
+*.o
+*.o.d
+httpd/httpd
+mbus/mbus
+picosh/picosh
+ringbuffer/ringbuffer
