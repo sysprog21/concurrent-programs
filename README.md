@@ -2,6 +2,7 @@
 
 ## Project Listing
 - [tpool](tpool/): A lightweight thread pool.
+- [tinync](tinync/): A tiny `nc` implementation using coroutine.
 - [picosh](picosh/): A minimalist UNIX shell.
 - [httpd](httpd/): A multi-threaded web server.
 - [ringbuffer](ringbuffer/): A lock-less ring buffer.
