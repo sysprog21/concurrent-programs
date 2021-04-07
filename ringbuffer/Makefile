@@ -1,5 +1,5 @@
 all:
-	gcc -Wall -Wextra -o ringbuffer ringbuffer.c
+	$(CC) -Wall -Wextra -o ringbuffer ringbuffer.c
 
 clean:
 	rm -f ringbuffer
