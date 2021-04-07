@@ -1,6 +1,7 @@
 # Complementary Programs for course "Linux Kernel Internals"
 
 ## Project Listing
+- [tpool](tpool/): A lightweight thread pool.
 - [picosh](picosh/): A minimalist UNIX shell.
 - [httpd](httpd/): A multi-threaded web server.
 - [ringbuffer](ringbuffer/): A lock-less ring buffer.
