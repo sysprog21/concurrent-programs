@@ -8,6 +8,7 @@
 - [httpd](httpd/): A multi-threaded web server.
 - [ringbuffer](ringbuffer/): A lock-less ring buffer.
 - [mbus](mbus/): A concurrent message bus.
+- [spmc](spmc/): A concurrent single-producer/multiple-consumer queue
 
 ## License
 
