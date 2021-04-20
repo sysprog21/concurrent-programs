@@ -6,6 +6,6 @@ tinync: tinync.o
 tinync.o : tinync.c
 
 clean:
-	rm -f tinync tinync
+	rm -f tinync.o tinync
 
 .PHONY: all clean
