@@ -1,3 +1,7 @@
+/* A multiple-producer/multiple-consumer queue
+ * NOTE: dequeue operation would block if there is no element.
+ */
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
