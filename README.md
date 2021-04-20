@@ -10,6 +10,7 @@
 - [mbus](mbus/): A concurrent message bus.
 - [spmc](spmc/): A concurrent single-producer/multiple-consumer queue.
 - [map-reduce](map-reduce/): word counting using MapReduce.
+- [mpmc](mpmc/): A multiple-producer/multiple-consumer queue.
 
 ## License
 
