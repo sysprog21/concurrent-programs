@@ -10,7 +10,8 @@
 - [mbus](mbus/): A concurrent message bus.
 - [spmc](spmc/): A concurrent single-producer/multiple-consumer queue.
 - [map-reduce](map-reduce/): word counting using MapReduce.
-- [mpmc](mpmc/): A multiple-producer/multiple-consumer queue.
+- [mpmc](mpmc/): A multiple-producer/multiple-consumer (MPMC) queue.
+- [channel](channel/): A Linux futex based Go channel implementation.
 
 ## License
 
