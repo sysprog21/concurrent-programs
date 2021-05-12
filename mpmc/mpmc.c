@@ -74,7 +74,7 @@ enum queue_ops {
     DEQ = 1 << 0,
 };
 
-/* regiseter the enqueuers first, dequeuers second. */
+/* register the enqueuers first, dequeuers second. */
 void mpmc_queue_register(mpmc_t *q, handle_t *th, int flag)
 {
     th->spare = mpmc_new_node();
@@ -122,8 +122,8 @@ static void *mpmc_find_cell(node_t *volatile *ptr, long i, handle_t *th)
 {
     node_t *curr = *ptr; /* get current node */
 
-    /* j is thread's local node'id (put node or pop node), (i / N) is the cell
-     * needed node'id. and we shoud take it, By filling the nodes between the j
+    /* j is thread's local node id (put node or pop node), (i / N) is the cell
+     * needed node id. and we should take it, By filling the nodes between the j
      * and (i / N) through 'next' field
      */
     for (long j = curr->id; j < i / N; ++j) {
@@ -198,8 +198,8 @@ void mpmc_enqueue(mpmc_t *q, handle_t *th, void *v)
     if ((cv = __atomic_exchange_n(c, v, __ATOMIC_ACQ_REL)) == NULL)
         return;
 
-    /* else the couterpart pop thread has wait this cell, so we just change the
-     * wating value to 0 and wake it
+    /* else the counterpart pop thread has wait this cell, so we just change the
+     * waiting value to 0 and wake it
      */
     *((int *) cv) = 0;
     mpmc_futex_wake(cv, 1);
@@ -236,7 +236,7 @@ void *mpmc_dequeue(mpmc_t *q, handle_t *th)
             mpmc_futex_wait(&futex_addr, 1);
         } while (futex_addr == 1);
 
-        /* the couterpart put thread has change futex_addr's value to 0. and the
+        /* the counterpart put thread has change futex_addr's value to 0. and the
          * data has into cell(c).
          */
         cv = *c;
@@ -293,7 +293,7 @@ over:
             if (new_id <= init_index)
                 /* __atomic_store_n(ptr, val, __ATOMIC_RELEASE) is a store with
                  * a preceding release fence to ensure all previous load and
-                 * stores completes before the current store is visiable.
+                 * stores completes before the current store is visible.
                  */
                 __atomic_store_n(&q->init_id, init_index, __ATOMIC_RELEASE);
             else {
