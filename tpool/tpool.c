@@ -324,7 +324,7 @@ int tpool_join(struct __threadpool *pool)
 #define PRECISION 100 /* upper bound in BPP sum */
 
 /* Use Bailey–Borwein–Plouffe formula to approximate PI */
-static void *bpp(void *arg)
+static void *bbp(void *arg)
 {
     int k = *(int *) arg;
     double sum = (4.0 / (8 * k + 1)) - (2.0 / (8 * k + 4)) -
@@ -337,24 +337,24 @@ static void *bpp(void *arg)
 
 int main()
 {
-    int bpp_args[PRECISION + 1];
-    double bpp_sum = 0;
+    int bbp_args[PRECISION + 1];
+    double bbp_sum = 0;
     tpool_t pool = tpool_create(4);
     tpool_future_t futures[PRECISION + 1];
 
     for (int i = 0; i <= PRECISION; i++) {
-        bpp_args[i] = i;
-        futures[i] = tpool_apply(pool, bpp, (void *) &bpp_args[i]);
+        bbp_args[i] = i;
+        futures[i] = tpool_apply(pool, bbp, (void *) &bbp_args[i]);
     }
 
     for (int i = 0; i <= PRECISION; i++) {
         double *result = tpool_future_get(futures[i], 0 /* blocking wait */);
-        bpp_sum += *result;
+        bbp_sum += *result;
         tpool_future_destroy(futures[i]);
         free(result);
     }
 
     tpool_join(pool);
-    printf("PI calculated with %d terms: %.15f\n", PRECISION + 1, bpp_sum);
+    printf("PI calculated with %d terms: %.15f\n", PRECISION + 1, bbp_sum);
     return 0;
 }
