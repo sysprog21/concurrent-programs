@@ -13,6 +13,8 @@
 - [mpmc](mpmc/): A multiple-producer/multiple-consumer (MPMC) queue.
 - [channel](channel/): A Linux futex based Go channel implementation.
 - [redirect](redirect/): An I/O multiplexer to monitor stdin redirect using `timerfd` and `epoll`.
+- [rcu\_list](rcu_list/): A concurrent linked list utilizing the simplified RCU algorithm.
+
 
 ## License
 
