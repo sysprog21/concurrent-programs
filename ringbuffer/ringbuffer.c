@@ -54,8 +54,9 @@ typedef struct {
 /* true if x is a power of 2 */
 #define IS_POWEROF2(x) ((((x) -1) & (x)) == 0)
 #define RING_SIZE_MASK (unsigned) (0x0fffffff) /**< Ring size mask */
-#define ALIGN_FLOOR(val, align) \
-    (typeof(val))((val) & (~((typeof(val))((align) -1))))
+#define ALIGN_CEIL(val, align) \
+    (typeof(val))((val) + (-(typeof(val))(val) & ((align) -1)))
+
 
 /**
  * Calculate the memory size needed for a ring buffer.
@@ -80,7 +81,7 @@ ssize_t ringbuf_get_memsize(const unsigned count)
         return -EINVAL;
 
     ssize_t sz = sizeof(ringbuf_t) + count * sizeof(void *);
-    sz = ALIGN_FLOOR(sz, CACHE_LINE_SIZE);
+    sz = ALIGN_CEIL(sz, CACHE_LINE_SIZE);
     return sz;
 }
 
