@@ -259,7 +259,7 @@ static void qsbr_writer(unsigned target)
 
         mock_remove_obj(obj);
 
-        /* QSBR synchronisation barrier. */
+        /* QSBR synchronization barrier. */
         target_epoch = qsbr_barrier(qsbr);
         while (!qsbr_sync(qsbr, target_epoch)) {
             SPINLOCK_BACKOFF(count);
