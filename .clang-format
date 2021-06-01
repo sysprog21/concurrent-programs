@@ -25,3 +25,4 @@ ForEachMacros:
   - rb_list_foreach
   - rb_list_foreach_safe
   - EV_FOREACH
+  - LIST_FOREACH

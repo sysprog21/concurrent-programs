@@ -15,6 +15,7 @@
 - [redirect](redirect/): An I/O multiplexer to monitor stdin redirect using `timerfd` and `epoll`.
 - [rcu\_list](rcu_list/): A concurrent linked list utilizing the simplified RCU algorithm.
 - [ringbuf\_shm](ringbuf_shm/): An optimized lock-free ring buffer with shared memory.
+- [qsbr](qsbr/): An implementation of Quiescent state based reclamation (QSBR).
 
 ## License
 
