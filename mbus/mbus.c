@@ -82,9 +82,8 @@ bus_register(bus_t *bus,
     return (bool) CAS(&(bus->clients[id]), &null_client, &new_client);
 }
 
-/*
- * Attempt to call a client's callback function to send a message.
- * Might fail if such client gets unregistered while attempting to send message.
+/* Attempt to call a client's callback function in a loop until it succeeds or
+ * it gets unregistered.
  */
 static bool execute_client_callback(bus_client_t *client, void *msg)
 {
@@ -101,6 +100,9 @@ static bool execute_client_callback(bus_client_t *client, void *msg)
         /* If CAS succeeds, the client had the expected reference count, and
          * we updated it successfully. If CAS fails, the client was updated
          * recently. The actual value is copied to local_client.
+         * We must to update the client this way instead of using
+         * __atomic_fetch_sub directly because we need to make sure that is
+         * still registered by the time we update the reference count.
          */
         if (CAS(client, &local_client, &new_client)) {
             /* Send a message and decrease the reference count back */
