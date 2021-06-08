@@ -19,6 +19,26 @@
 #include <sys/wait.h>  /* For wait */
 #include <unistd.h>    /* For getpid */
 
+/* A simple solution to avoid unexpected output by the buffered I/O 'printf' is
+ * using low-level I/O interface 'write'. It works because 'printf' will wait to
+ * write to STDOUT until the buffer is full, or on some other conditions. Using
+ * write, however, can write to STDOUT immediately.
+ *
+ * Here is a naive implementation for the idea with some limitation and weakness
+ * that need improvement:
+ * 1. It will fail if the formatted string with length >64
+ * 2. The function 'write' can write less than n bytes. It will need further
+ *    handling if happens.
+ */
+#define BUF_LEN 64
+#define printf_unbuffered(fmt, ...)                                         \
+    do {                                                                    \
+        char str[BUF_LEN + 1];                                              \
+        int n = snprintf(str, BUF_LEN + 1, fmt __VA_OPT__(, ) __VA_ARGS__); \
+        write(1, str, n);                                                   \
+    } while (0)
+#define printf printf_unbuffered
+
 typedef struct {
     pid_t pid;   /* The pid of the child thread as returned by clone */
     void *stack; /* The stack pointer */
