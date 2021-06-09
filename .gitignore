@@ -4,3 +4,6 @@ httpd/httpd
 mbus/mbus
 picosh/picosh
 ringbuffer/ringbuffer
+
+# external source files
+preempt_sched/list.h

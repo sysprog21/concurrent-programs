@@ -16,6 +16,7 @@
 - [rcu\_list](rcu_list/): A concurrent linked list utilizing the simplified RCU algorithm.
 - [ringbuf\_shm](ringbuf_shm/): An optimized lock-free ring buffer with shared memory.
 - [qsbr](qsbr/): An implementation of Quiescent state based reclamation (QSBR).
+- [preempt\_sched](preempt_sched/): A preemptive userspace multitasking based on a SIGALRM signal.
 
 ## License
 
