@@ -31,12 +31,12 @@ struct cr {
 
 #define cr_local static
 
-#define cr_begin()                         \
-    do {                                   \
-        if ((ctx)->status == CR_FINISHED)  \
-            return;                        \
-        if ((ctx)->label)                  \
-            goto *(ctx)->label;            \
+#define cr_begin()                        \
+    do {                                  \
+        if ((ctx)->status == CR_FINISHED) \
+            return;                       \
+        if ((ctx)->label)                 \
+            goto *(ctx)->label;           \
     } while (0)
 #define cr_label(o, stat)                                   \
     do {                                                    \
@@ -47,17 +47,17 @@ struct cr {
 
 #define cr_status(name) cr_context_name(name).status
 
-#define cr_wait(cond)               \
-    do {                            \
-        cr_label(ctx, CR_BLOCKED);  \
-        if (!(cond))                \
-            return;                 \
+#define cr_wait(cond)              \
+    do {                           \
+        cr_label(ctx, CR_BLOCKED); \
+        if (!(cond))               \
+            return;                \
     } while (0)
 
-#define cr_exit(stat)         \
-    do {                      \
-        cr_label(ctx, stat);  \
-        return;               \
+#define cr_exit(stat)        \
+    do {                     \
+        cr_label(ctx, stat); \
+        return;              \
     } while (0)
 
 #define cr_queue(T, size) \
@@ -178,10 +178,7 @@ int main(int argc, char *argv[])
 
     struct sockaddr_in addr = {
         .sin_family = AF_INET,
-        .sin_addr =
-            {
-                .s_addr = inet_addr(host),
-            },
+        .sin_addr = {.s_addr = inet_addr(host)},
         .sin_port = htons(port),
     };
     connect(fd, (struct sockaddr *) &addr, sizeof(struct sockaddr_in));
