@@ -13,6 +13,7 @@ purpose of these programs is to be illustrative and educational.
     - [tpool](tpool/): A lightweight thread pool.
 * [Producer–consumer problem](https://en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem)
     - [spmc](spmc/): A concurrent single-producer/multiple-consumer queue.
+    - [mpsc](mpsc/): An unbounded lockless single-consumer/multiple-producer FIFO queue.
     - [mpmc](mpmc/): A multiple-producer/multiple-consumer (MPMC) queue.
     - [channel](channel/): A Linux futex based Go channel implementation.
 * [Lock-Free](https://en.wikipedia.org/wiki/Non-blocking_algorithm) Data Structure
