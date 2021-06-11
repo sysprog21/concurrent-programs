@@ -5,7 +5,7 @@
 #define unlikely(x) __builtin_expect((x) != 0, 0)
 
 #ifndef atomic_fetch_add
-#define atomic_fetch_add(x, a) __sync_fetch_and_add(x, a)
+#define atomic_fetch_add(x, a) __atomic_fetch_add(x, a, __ATOMIC_SEQ_CST)
 #endif
 
 #ifndef atomic_thread_fence
