@@ -18,7 +18,7 @@ purpose of these programs is to be illustrative and educational.
     - [channel](channel/): A Linux futex based Go channel implementation.
 * [Lock-Free](https://en.wikipedia.org/wiki/Non-blocking_algorithm) Data Structure
     - [ringbuffer](ringbuffer/): A lock-less ring buffer.
-    - [ringbuf\_shm](ringbuf_shm/): An optimized lock-free ring buffer with shared memory.
+    - [ringbuf\_shm](ringbuf-shm/): An optimized lock-free ring buffer with shared memory.
     - [mbus](mbus/): A concurrent message bus.
 * [Synchronization](https://en.wikipedia.org/wiki/Synchronization_(computer_science))
     - [qsbr](qsbr/): An implementation of Quiescent state based reclamation (QSBR).
