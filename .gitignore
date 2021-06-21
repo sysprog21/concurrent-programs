@@ -4,6 +4,20 @@ httpd/httpd
 mbus/mbus
 picosh/picosh
 ringbuffer/ringbuffer
+map-reduce/word-count
+rcu_list/rcu_list
+ringbuf-shm/ringbuffer
+fiber/fiber
+channel/channel
+mpmc/mpmc
+mpsc/mpsc
+spmc/spmc
+preempt_sched/task_sched
+qsbr/main
+rcu_queue/rcu_queue
+redirect/redirect
+tinync/tinync
+tpool/tpool
 
 # external source files
 preempt_sched/list.h
