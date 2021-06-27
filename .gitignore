@@ -18,6 +18,8 @@ rcu_queue/rcu_queue
 redirect/redirect
 tinync/tinync
 tpool/tpool
+list-move/bench-lock
+list-move/bench-lockfree
 
 # external source files
 preempt_sched/list.h
