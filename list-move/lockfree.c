@@ -16,10 +16,10 @@ typedef struct {
     void *freelist[QSBR_N_EPOCHS][QSBR_FREELIST_SIZE];
 } qsbr_pthread_data_t;
 
-/* TODO: write with C11 Atomics */
-#define CAS(addr, oldv, newv) \
-    __sync_bool_compare_and_swap((addr), (oldv), (newv))
-#define FETCH_AND_ADD(addr, v) __sync_fetch_and_add((addr), (v))
+#define CAS(addr, oldv, newv)                                              \
+    __atomic_compare_exchange((addr), &(oldv), &(newv), 0, __ATOMIC_RELAXED, \
+                              __ATOMIC_RELAXED)
+#define FETCH_AND_ADD(addr, v) __atomic_fetch_add((addr), (v), __ATOMIC_RELAXED)
 #define MEM_BARRIER() __sync_synchronize()
 
 static long n_threads = 0;
@@ -285,7 +285,8 @@ static int lf_list_write_cs_exit(lf_list_pthread_data_t *lf_list_data)
                 it_rec->epoch = epoch;
         }
 
-        if (CAS(&it_rec->rec_next, NULL, new_rec)) {
+        const void *nullptr = NULL;
+        if (CAS(&it_rec->rec_next, nullptr, new_rec)) {
             new_rec->epoch = epoch;
             new_rec->slots[0]->epoch = epoch;
             new_rec->slots[1]->epoch = epoch;
