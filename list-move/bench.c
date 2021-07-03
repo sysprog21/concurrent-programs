@@ -66,18 +66,18 @@ int main(void)
 
     pthread_t *threads;
     if (!(threads = malloc(n_threads * sizeof(pthread_t)))) {
-        printf("failed to malloc pthread_t\n");
+        printf("Failed to allocate pthread_t\n");
         goto out;
     }
 
     pthread_data_t **data;
     if (!(data = malloc(n_threads * sizeof(pthread_data_t *)))) {
-        printf("failed to malloc pthread_data_t\n");
+        printf("Failed to allocate pthread_data_t\n");
         goto out;
     }
     for (int i = 0; i < n_threads; i++) {
         if ((data[i] = alloc_pthread_data()) == NULL) {
-            printf("failed to malloc pthread_data_t %d\n", i);
+            printf("Failed to allocate pthread_data_t %d\n", i);
             goto out;
         }
     }
@@ -86,7 +86,7 @@ int main(void)
 
     void *list;
     if (!(list = list_global_init(init_size, value_range))) {
-        printf("failed to do list_global_init\n");
+        printf("Failed to do list_global_init\n");
         goto out;
     }
 
@@ -136,8 +136,7 @@ int main(void)
         n_move += (data[i]->n_move);
 
     printf("\tduration:     %d ms\n", duration);
-    printf("\tops/second    %lu (%f/s)\n", n_move,
-           n_move * (1000.0) / duration);
+    printf("\tops/second    %f/s\n", n_move * (1000.0) / duration);
 
     for (int i = 0; i < n_threads; i++)
         free_pthread_data(data[i]);
