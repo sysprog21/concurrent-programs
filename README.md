@@ -21,8 +21,8 @@ purpose of these programs is to be illustrative and educational.
     - [ringbuf\_shm](ringbuf-shm/): An optimized lock-free ring buffer with shared memory.
     - [mbus](mbus/): A concurrent message bus.
 * [Synchronization](https://en.wikipedia.org/wiki/Synchronization_(computer_science))
-    - [qsbr](qsbr/): An implementation of Quiescent state based reclamation (QSBR).
     - [rcu\_list](rcu_list/): A concurrent linked list utilizing the simplified RCU algorithm.
+    - [qsbr](qsbr/): An implementation of Quiescent state based reclamation (QSBR).
     - [list-move](list-move/): Evaluation of two concurrent linked lists: QSBR and lock-based.
     - [rcu\_queue](rcu_queue/): An efficient concurrent queue based on QSBR.
 * Applications
