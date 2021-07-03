@@ -63,7 +63,6 @@
  * Note that this interface is asynchronous.
  */
 
-#include <errno.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -93,7 +92,6 @@ qsbr_t *qsbr_create(void)
     qsbr_t *qs;
     int ret = posix_memalign((void **) &qs, CACHE_LINE_SIZE, sizeof(qsbr_t));
     if (ret != 0) {
-        errno = ret;
         return NULL;
     }
     memset(qs, 0, sizeof(qsbr_t));
@@ -114,17 +112,15 @@ void qsbr_destroy(qsbr_t *qs)
     free(qs);
 }
 
-/* qsbr_register: register the current thread for QSBR. */
+/* qsbr_register: register the current thread for QSBR */
 int qsbr_register(qsbr_t *qs)
 {
     qsbr_tls_t *t = pthread_getspecific(qs->tls_key);
     if (unlikely(!t)) {
-        int ret =
-            posix_memalign((void **) &t, CACHE_LINE_SIZE, sizeof(qsbr_tls_t));
-        if (ret != 0) {
-            errno = ret;
+        /* posix_memalign() returns zero on success */
+        if (posix_memalign((void **) &t, CACHE_LINE_SIZE, sizeof(qsbr_tls_t)) !=
+            0)
             return -1;
-        }
         pthread_setspecific(qs->tls_key, t);
     }
     memset(t, 0, sizeof(qsbr_tls_t));
@@ -193,8 +189,6 @@ bool qsbr_sync(qsbr_t *qs, qsbr_epoch_t target)
 #include <stdio.h>
 #include <unistd.h>
 
-static unsigned nsec = 10; /* seconds */
-
 static pthread_barrier_t barrier;
 static unsigned n_workers;
 static volatile bool stop;
@@ -202,20 +196,18 @@ static volatile bool stop;
 typedef struct {
     unsigned int *ptr;
     bool visible;
-    char _pad[CACHE_LINE_SIZE - 8 - 4 - 4 - 8];
-} data_struct_t;
-
-#define N_DS 4
+} __attribute__((__aligned__(CACHE_LINE_SIZE))) data_t;
 
 #define MAGIC 0xDEADBEEF
-static unsigned magic_val = MAGIC;
+static const unsigned magic_val = MAGIC;
 
 static qsbr_t *qsbr;
 
-static data_struct_t ds[N_DS] __attribute__((__aligned__(CACHE_LINE_SIZE)));
+#define N_DATA 4
+static data_t data[N_DATA];
 static uint64_t destructions;
 
-static void access_obj(data_struct_t *obj)
+static void access_obj(data_t *obj)
 {
     if (atomic_load_explicit(&obj->visible, memory_order_relaxed)) {
         atomic_thread_fence(memory_order_acquire);
@@ -224,21 +216,22 @@ static void access_obj(data_struct_t *obj)
     }
 }
 
-static void mock_insert_obj(data_struct_t *obj)
+static void insert_obj(data_t *obj)
 {
-    obj->ptr = &magic_val;
+    obj->ptr = (unsigned int *) &magic_val;
     assert(!obj->visible);
     atomic_thread_fence(memory_order_release);
     atomic_store_explicit(&obj->visible, true, memory_order_relaxed);
 }
 
-static void mock_remove_obj(data_struct_t *obj)
+static void remove_obj(data_t *obj)
 {
     assert(obj->visible);
-    obj->visible = false;
+    // obj->visible = false;
+    atomic_store_explicit(&obj->visible, false, memory_order_relaxed);
 }
 
-static void mock_destroy_obj(data_struct_t *obj)
+static void destroy_obj(data_t *obj)
 {
     obj->ptr = NULL;
     destructions++;
@@ -248,7 +241,7 @@ static void mock_destroy_obj(data_struct_t *obj)
 
 static void qsbr_writer(unsigned target)
 {
-    data_struct_t *obj = &ds[target];
+    data_t *obj = &data[target];
 
     if (obj->visible) {
         /* The data structure is visible. First, ensure it is no longer
@@ -257,9 +250,9 @@ static void qsbr_writer(unsigned target)
         unsigned count = SPINLOCK_BACKOFF_MIN;
         qsbr_epoch_t target_epoch;
 
-        mock_remove_obj(obj);
+        remove_obj(obj);
 
-        /* QSBR synchronization barrier. */
+        /* QSBR synchronization barrier */
         target_epoch = qsbr_barrier(qsbr);
         while (!qsbr_sync(qsbr, target_epoch)) {
             SPINLOCK_BACKOFF(count);
@@ -271,12 +264,12 @@ static void qsbr_writer(unsigned target)
         }
 
         /* It is safe to "destroy" the object now. */
-        mock_destroy_obj(obj);
+        destroy_obj(obj);
     } else {
         /* Data structure is not globally visible. Set the value and make it
          * visible (think of the "insert" semantics).
          */
-        mock_insert_obj(obj);
+        insert_obj(obj);
     }
 }
 
@@ -285,7 +278,8 @@ static void *qsbr_stress(void *arg)
     const unsigned id = (uintptr_t) arg;
     unsigned n = 0;
 
-    qsbr_register(qsbr);
+    if (qsbr_register(qsbr) != 0)
+        abort();
 
     /* There are NCPU threads concurrently reading data and a single writer
      * thread (ID 0) modifying data. The writer will modify the pointer used
@@ -294,7 +288,7 @@ static void *qsbr_stress(void *arg)
      */
     pthread_barrier_wait(&barrier);
     while (!stop) {
-        n = (n + 1) & (N_DS - 1);
+        n = (n + 1) & (N_DATA - 1);
         if (id == 0) {
             qsbr_writer(n);
             continue;
@@ -308,7 +302,7 @@ static void *qsbr_stress(void *arg)
          * Incorrect reclamation mechanism would lead to the crash in the
          * following pointer dereference.
          */
-        access_obj(&ds[n]);
+        access_obj(&data[n]);
         qsbr_checkpoint(qsbr);
     }
     pthread_barrier_wait(&barrier);
@@ -325,12 +319,14 @@ static void leave(int sig)
 
 typedef void *(*func_t)(void *);
 
+static unsigned nsec = 10; /* seconds */
+
 static void run_test(func_t func)
 {
     struct sigaction sigalarm;
 
     n_workers = sysconf(_SC_NPROCESSORS_CONF);
-    pthread_t *thr = calloc(n_workers, sizeof(pthread_t));
+    pthread_t *threads = calloc(n_workers, sizeof(pthread_t));
     pthread_barrier_init(&barrier, NULL, n_workers);
     stop = false;
 
@@ -339,21 +335,22 @@ static void run_test(func_t func)
     int ret = sigaction(SIGALRM, &sigalarm, NULL);
     assert(ret == 0);
 
-    memset(&ds, 0, sizeof(ds));
+    memset(&data, 0, sizeof(data));
     qsbr = qsbr_create();
     destructions = 0;
 
     alarm(nsec); /* Spin the test */
 
     for (unsigned i = 0; i < n_workers; i++) {
-        if ((errno = pthread_create(&thr[i], NULL, func,
-                                    (void *) (uintptr_t) i)) != 0) {
+        if (pthread_create(&threads[i], NULL, func, (void *) (uintptr_t) i) !=
+            0) {
             exit(EXIT_FAILURE);
         }
     }
     for (unsigned i = 0; i < n_workers; i++)
-        pthread_join(thr[i], NULL);
+        pthread_join(threads[i], NULL);
     pthread_barrier_destroy(&barrier);
+    free(threads);
     printf("# %" PRIu64 "\n", destructions);
 
     qsbr_destroy(qsbr);
