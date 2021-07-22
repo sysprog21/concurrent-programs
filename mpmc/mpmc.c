@@ -160,7 +160,7 @@ static void *mpmc_find_cell(node_t *volatile *ptr, long i, handle_t *th)
     __asm("sfence" ::: "cc", "memory"); /* FIXME: x86-only */
 
     /* now we get the needed cell, its' node is curr and index is i % N */
-    return &curr->cells[i & N];
+    return &curr->cells[i & NBITS];
 }
 
 #include <linux/futex.h>
