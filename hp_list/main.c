@@ -230,14 +230,14 @@ try_again:
     if (atomic_load(prev) != get_unmarked(curr))
         goto try_again;
     while (true) {
-        if (!get_unmarked_node(curr))
-            return false;
         next = (list_node_t *) atomic_load(&get_unmarked_node(curr)->next);
         (void) list_hp_protect_ptr(list->hp, HP_NEXT, get_unmarked(next));
+        /* On a CAS failure, the search function, "__list_find," will simply
+         * have to go backwards in the list until an unmarked element is found
+         * from which the search in increasing key order can be started.
+         */
         if (atomic_load(&get_unmarked_node(curr)->next) != (uintptr_t) next)
-            break;
-        if (get_unmarked(next) == atomic_load((atomic_uintptr_t *) &list->tail))
-            break;
+            goto try_again;
         if (atomic_load(prev) != get_unmarked(curr))
             goto try_again;
         if (get_unmarked_node(next) == next) {
@@ -259,11 +259,6 @@ try_again:
         curr = next;
         (void) list_hp_protect_release(list->hp, HP_CURR, get_unmarked(next));
     }
-    *par_curr = curr;
-    *par_prev = prev;
-    *par_next = next;
-
-    return false;
 }
 
 bool list_insert(list_t *list, list_key_t key)
