@@ -12,6 +12,11 @@ $(BIN): main.c
 all: CFLAGS += -O2
 all: $(BIN)
 
+# Once RUNTIME_STAT is defined, the program will show runtime states in
+# statistics.
+analyze: CFLAGS +=-D RUNTIME_STAT
+analyze: $(BIN)
+
 indent:
 	clang-format -i *.[ch]
 
