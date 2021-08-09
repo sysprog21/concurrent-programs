@@ -16,4 +16,4 @@ indent:
 	clang-format -i *.[ch]
 
 clean:
-	rm -f list
+	rm -f $(BIN)
