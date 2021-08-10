@@ -14,6 +14,105 @@
 #include <string.h>
 #include <threads.h>
 
+static atomic_uint_fast64_t deletes = 0, inserts = 0;
+
+/*
+ * Reference :
+ * A more Pragmatic Implementation of the Lock-free, Ordered, Linked List
+ * https://arxiv.org/abs/2010.15755
+ */
+#ifdef RUNTIME_STAT
+
+enum {
+    TRACE_nop = 0,
+    TRACE_retry,     /* the number of retries in the __list_find function. */
+    TRACE_contains,  /* the number of wait-free contains in the __list_find
+                        function  that curr pointer pointed. */
+    TRACE_traversal, /* the number of list element traversal in the __list_find
+                        function. */
+    TRACE_fail,      /* the number of CAS() failures. */
+    TRACE_del, /* the number of list_delete operation failed and restart again.
+                */
+    TRACE_ins, /* the number of list_insert operation failed and restart again.
+                */
+    TRACE_inserts, /* the number of atomic_load operation in list_delete,
+                      list_insert and __list_find. */
+    TRACE_deletes  /* the number of atomic_store operation in list_delete,
+                      list_insert and __list_find. */
+};
+
+struct runtime_statistics {
+    atomic_uint_fast64_t retry, contains, traversal, fail;
+    atomic_uint_fast64_t del, ins;
+    atomic_uint_fast64_t load, store;
+};
+static struct runtime_statistics stats = {0};
+
+#define CAS(obj, expected, desired)                                          \
+    ({                                                                       \
+        bool __ret = atomic_compare_exchange_strong(obj, expected, desired); \
+        if (!__ret)                                                          \
+            atomic_fetch_add(&stats.fail, 1);                                \
+        __ret;                                                               \
+    })
+#define ATOMIC_LOAD(obj)                  \
+    ({                                    \
+        atomic_fetch_add(&stats.load, 1); \
+        atomic_load(obj);                 \
+    })
+#define ATOMIC_STORE_EXPLICIT(obj, desired, order)  \
+    do {                                            \
+        atomic_fetch_add(&stats.store, 1);          \
+        atomic_store_explicit(obj, desired, order); \
+    } while (0)
+#define TRACE(ops)                           \
+    do {                                     \
+        if (TRACE_##ops)                     \
+            atomic_fetch_add(&stats.ops, 1); \
+    } while (0)
+
+static void do_analysis(void)
+{
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+#define TRACE_PRINT(ops) printf("%-10s: %ld\n", #ops, stats.ops);
+    TRACE_PRINT(retry);
+    TRACE_PRINT(contains);
+    TRACE_PRINT(traversal);
+    TRACE_PRINT(fail);
+    TRACE_PRINT(del)
+    TRACE_PRINT(ins);
+    TRACE_PRINT(load);
+    TRACE_PRINT(store);
+#undef TRACE_PRINT
+#define TRACE_PRINT(val) printf("%-10s: %ld\n", #val, val);
+    TRACE_PRINT(deletes);
+    TRACE_PRINT(inserts);
+#undef TRACE_PRINT
+}
+
+#else
+
+#define CAS(obj, expected, desired) \
+    ({ atomic_compare_exchange_strong(obj, expected, desired); })
+#define ATOMIC_LOAD(obj) ({ atomic_load(obj); })
+#define ATOMIC_STORE_EXPLICIT(obj, desired, order)  \
+    do {                                            \
+        atomic_store_explicit(obj, desired, order); \
+    } while (0)
+#define TRACE(ops) \
+    do {           \
+    } while (0)
+
+static void do_analysis(void)
+{
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+    fprintf(stderr, "inserts = %zu, deletes = %zu\n", inserts, deletes);
+}
+
+#endif /* RUNTIME_STAT */
+
+#define RUNTIME_STAT_INIT() atexit(do_analysis)
+
 #define HP_MAX_THREADS 128
 #define HP_MAX_HPS 5 /* This is named 'K' in the HP paper */
 #define CLPAD (128 / sizeof(uintptr_t))
@@ -162,8 +261,6 @@ void list_hp_retire(list_hp_t *hp, uintptr_t ptr)
 #define N_THREADS (128 / 2)
 #define MAX_THREADS 128
 
-static atomic_uint_fast32_t deletes = 0, inserts = 0;
-
 enum { HP_NEXT = 0, HP_CURR = 1, HP_PREV };
 
 #define is_marked(p) (bool) ((uintptr_t)(p) &0x01)
@@ -225,21 +322,29 @@ static bool __list_find(list_t *list,
 
 try_again:
     prev = &list->head;
-    curr = (list_node_t *) atomic_load(prev);
+    curr = (list_node_t *) ATOMIC_LOAD(prev);
     (void) list_hp_protect_ptr(list->hp, HP_CURR, (uintptr_t) curr);
-    if (atomic_load(prev) != get_unmarked(curr))
+    if (ATOMIC_LOAD(prev) != get_unmarked(curr)) {
+        TRACE(retry);
         goto try_again;
+    }
     while (true) {
-        next = (list_node_t *) atomic_load(&get_unmarked_node(curr)->next);
+        if (is_marked(curr))
+            TRACE(contains);
+        next = (list_node_t *) ATOMIC_LOAD(&get_unmarked_node(curr)->next);
         (void) list_hp_protect_ptr(list->hp, HP_NEXT, get_unmarked(next));
         /* On a CAS failure, the search function, "__list_find," will simply
          * have to go backwards in the list until an unmarked element is found
          * from which the search in increasing key order can be started.
          */
-        if (atomic_load(&get_unmarked_node(curr)->next) != (uintptr_t) next)
+        if (ATOMIC_LOAD(&get_unmarked_node(curr)->next) != (uintptr_t) next) {
+            TRACE(retry);
             goto try_again;
-        if (atomic_load(prev) != get_unmarked(curr))
+        }
+        if (ATOMIC_LOAD(prev) != get_unmarked(curr)) {
+            TRACE(retry);
             goto try_again;
+        }
         if (get_unmarked_node(next) == next) {
             if (!(get_unmarked_node(curr)->key < *key)) {
                 *par_curr = curr;
@@ -252,12 +357,15 @@ try_again:
                                            get_unmarked(curr));
         } else {
             uintptr_t tmp = get_unmarked(curr);
-            if (!atomic_compare_exchange_strong(prev, &tmp, get_unmarked(next)))
+            if (!CAS(prev, &tmp, get_unmarked(next))) {
+                TRACE(retry);
                 goto try_again;
+            }
             list_hp_retire(list->hp, get_unmarked(curr));
         }
         curr = next;
         (void) list_hp_protect_release(list->hp, HP_CURR, get_unmarked(next));
+        TRACE(traversal);
     }
 }
 
@@ -274,13 +382,14 @@ bool list_insert(list_t *list, list_key_t key)
             list_hp_clear(list->hp);
             return false;
         }
-        atomic_store_explicit(&node->next, (uintptr_t) curr,
+        ATOMIC_STORE_EXPLICIT(&node->next, (uintptr_t) curr,
                               memory_order_relaxed);
         uintptr_t tmp = get_unmarked(curr);
-        if (atomic_compare_exchange_strong(prev, &tmp, (uintptr_t) node)) {
+        if (CAS(prev, &tmp, (uintptr_t) node)) {
             list_hp_clear(list->hp);
             return true;
         }
+        TRACE(ins);
     }
 }
 
@@ -296,12 +405,13 @@ bool list_delete(list_t *list, list_key_t key)
 
         uintptr_t tmp = get_unmarked(next);
 
-        if (!atomic_compare_exchange_strong(&curr->next, &tmp,
-                                            get_marked(next)))
+        if (!CAS(&curr->next, &tmp, get_marked(next))) {
+            TRACE(del);
             continue;
+        }
 
         tmp = get_unmarked(curr);
-        if (atomic_compare_exchange_strong(prev, &tmp, get_unmarked(next))) {
+        if (CAS(prev, &tmp, get_unmarked(next))) {
             list_hp_clear(list->hp);
             list_hp_retire(list->hp, get_unmarked(curr));
         } else {
@@ -364,6 +474,7 @@ static void *delete_thread(void *arg)
 
 int main(void)
 {
+    RUNTIME_STAT_INIT();
     list_t *list = list_new();
 
     pthread_t thr[N_THREADS];
@@ -381,9 +492,6 @@ int main(void)
     }
 
     list_destroy(list);
-
-    fprintf(stderr, "inserts = %zu, deletes = %zu\n", atomic_load(&inserts),
-            atomic_load(&deletes));
 
     return 0;
 }
