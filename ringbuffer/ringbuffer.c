@@ -26,8 +26,7 @@
     } while (0)
 #endif
 
-/**
- * The producer and the consumer have a head and a tail index. The particularity
+/* The producer and the consumer have a head and a tail index. The particularity
  * of these index is that they are not between 0 and size(ring). These indexes
  * are between 0 and 2^32, and we mask their value when we access the ring[]
  * field. Thanks to this assumption, we can do subtractions between 2 index
@@ -37,14 +36,14 @@
 typedef struct {
     struct {                          /** Ring producer status. */
         uint32_t watermark;           /**< Maximum items before EDQUOT. */
-        uint32_t size;                /**< Size of ring. */
-        uint32_t mask;                /**< Mask (size - 1) of ring. */
+        uint32_t size;                /**< Size of ring buffer. */
+        uint32_t mask;                /**< Mask (size - 1) of ring buffer. */
         volatile uint32_t head, tail; /**< Producer head and tail. */
     } prod __attribute__((__aligned__(CACHE_LINE_SIZE)));
 
     struct {                          /** Ring consumer status. */
-        uint32_t size;                /**< Size of the ring. */
-        uint32_t mask;                /**< Mask (size - 1) of ring. */
+        uint32_t size;                /**< Size of the ring buffer. */
+        uint32_t mask;                /**< Mask (size - 1) of ring buffer. */
         volatile uint32_t head, tail; /**< Consumer head and tail. */
     } cons __attribute__((__aligned__(CACHE_LINE_SIZE)));
 
@@ -57,9 +56,7 @@ typedef struct {
 #define ALIGN_CEIL(val, align) \
     (typeof(val))((val) + (-(typeof(val))(val) & ((align) -1)))
 
-
-/**
- * Calculate the memory size needed for a ring buffer.
+/* Calculate the memory size needed for a ring buffer.
  *
  * This function returns the number of bytes needed for a ring buffer, given
  * the number of elements in it. This value is the sum of the size of the
@@ -67,9 +64,9 @@ typedef struct {
  * The value is aligned to a cache line size.
  *
  * @param count
- *   The number of elements in the ring (must be a power of 2).
+ *   The number of elements in the ring buffer (must be a power of 2).
  * @return
- *   - The memory size occupied by the ring on success.
+ *   - The memory size occupied by the ring buffer on success.
  *   - -EINVAL if count is not a power of 2.
  */
 ssize_t ringbuf_get_memsize(const unsigned count)
@@ -85,17 +82,16 @@ ssize_t ringbuf_get_memsize(const unsigned count)
     return sz;
 }
 
-/**
- * Initialize a ring buffer.
+/* Initialize a ring buffer.
  *
  * The ring size is set to *count*, which must be a power of two. Water
  * marking is disabled by default. The real usable ring size is (count - 1)
- * instead of (count) to differentiate a free ring from an empty ring.
+ * instead of (count) to differentiate a free ring from an empty ring buffer.
  *
  * @param r
- *   The pointer to the ring structure followed by the objects table.
+ *   The pointer to the ring buffer structure followed by the objects table.
  * @param count
- *   The number of elements in the ring (must be a power of 2).
+ *   The number of elements in the ring buffer (must be a power of 2).
  * @return
  *   0 on success, or a negative value on error.
  */
@@ -109,17 +105,16 @@ int ringbuf_init(ringbuf_t *r, const unsigned count)
     return 0;
 }
 
-/**
- * Create a ring buffer.
+/* Create a ring buffer.
  *
  * The real usable ring size is (count - 1) instead of (count) to
- * differentiate a free ring from an empty ring.
+ * differentiate a free ring from an empty ring buffer.
  *
  * @param count
  *   The size of the ring (must be a power of 2).
  * @return
- *   On success, the pointer to the new allocated ring. NULL on error with
- *    errno set appropriately. Possible errno values include:
+ *   On success, the pointer to the new allocated ring buffer. NULL on error
+ *   with errno set appropriately. Possible errno values include:
  *    - EINVAL - count provided is not a power of 2
  *    - ENOSPC - the maximum number of memzones has already been allocated
  *    - EEXIST - a memzone with the same name already exists
@@ -137,8 +132,7 @@ ringbuf_t *ringbuf_create(const unsigned count)
     return r;
 }
 
-/**
- * Release all memory used by the ring.
+/* Release all memory used by the ring buffer.
  *
  * @param r
  *   Ring to free
@@ -148,7 +142,7 @@ void ringbuf_free(ringbuf_t *r)
     free(r);
 }
 
-/* The actual enqueue of pointers on the ring.
+/* The actual enqueue of pointers on the ring buffer.
  * Placed here since identical code needed in both single- and multi- producer
  * enqueue functions.
  */
@@ -210,16 +204,14 @@ void ringbuf_free(ringbuf_t *r)
         }                                                                \
     } while (0)
 
-/**
- * @internal Enqueue several objects on a ring buffer (NOT multi-producers
- * safe).
+/* Enqueue several objects on a ring buffer (NOT multi-producers safe).
  *
  * @param r
- *   A pointer to the ring structure.
+ *   A pointer to the ring buffer structure.
  * @param obj_table
  *   A pointer to a table of void * pointers (objects).
  * @param n
- *   The number of objects to add in the ring from the obj_table.
+ *   The number of objects to add in the ring buffer from the obj_table.
  * @return
  *   - 0: Success; objects enqueue.
  *   - -EDQUOT: Quota exceeded. The objects have been enqueued, but the
@@ -238,14 +230,14 @@ static inline int ringbuffer_sp_do_enqueue(ringbuf_t *r,
      */
     uint32_t free_entries = mask + cons_tail - prod_head;
 
-    /* check that we have enough room in ring */
+    /* check that we have enough room in ring buffer */
     if ((n > free_entries))
         return -ENOBUFS;
 
     uint32_t prod_next = prod_head + n;
     r->prod.head = prod_next;
 
-    /* write entries in ring */
+    /* write entries in ring buffer */
     ENQUEUE_PTRS();
     __compiler_barrier();
 
@@ -255,20 +247,19 @@ static inline int ringbuffer_sp_do_enqueue(ringbuf_t *r,
     return ((mask + 1) - free_entries + n) > r->prod.watermark ? -EDQUOT : 0;
 }
 
-/**
- * @internal Dequeue several objects from a ring buffer (NOT multi-consumers
- * safe). When the request objects are more than the available objects, only
- * dequeue the actual number of objects
+/* Dequeue several objects from a ring buffer (NOT multi-consumers safe).
+ * When the request objects are more than the available objects, only dequeue
+ * the actual number of objects
  *
  * @param r
- *   A pointer to the ring structure.
+ *   A pointer to the ring buffer structure.
  * @param obj_table
  *   A pointer to a table of void * pointers (objects) that will be filled.
  * @param n
- *   The number of objects to dequeue from the ring to the obj_table.
+ *   The number of objects to dequeue from the ring buffer to the obj_table.
  * @return
  *   - 0: Success; objects dequeued.
- *   - -ENOENT: Not enough entries in the ring to dequeue; no object is
+ *   - -ENOENT: Not enough entries in the ring buffer to dequeue; no object is
  *     dequeued.
  */
 static inline int ringbuffer_sc_do_dequeue(ringbuf_t *r,
@@ -297,18 +288,18 @@ static inline int ringbuffer_sc_do_dequeue(ringbuf_t *r,
     return 0;
 }
 
-/**
- * Enqueue one object on a ring buffer (NOT multi-producers safe).
+/* Enqueue one object on a ring buffer (NOT multi-producers safe).
  *
  * @param r
- *   A pointer to the ring structure.
+ *   A pointer to the ring buffer structure.
  * @param obj
  *   A pointer to the object to be added.
  * @return
  *   - 0: Success; objects enqueued.
  *   - -EDQUOT: Quota exceeded. The objects have been enqueued, but the
  *     high water mark is exceeded.
- *   - -ENOBUFS: Not enough room in the ring to enqueue; no object is enqueued.
+ *   - -ENOBUFS: Not enough room in the ring buffer to enqueue; no object
+ *     is enqueued.
  */
 static inline int ringbuf_sp_enqueue(ringbuf_t *r, void *obj)
 {
@@ -324,16 +315,15 @@ static inline int ringbuf_sp_enqueue(ringbuf_t *r, void *obj)
  *   A pointer to a void * pointer (object) that will be filled.
  * @return
  *   - 0: Success; objects dequeued.
- *   - -ENOENT: Not enough entries in the ring to dequeue, no object is
- *     dequeued.
+ *   - -ENOENT: Not enough entries in the ring buffer to dequeue, no object
+ *     is dequeued.
  */
 static inline int ringbuf_sc_dequeue(ringbuf_t *r, void **obj_p)
 {
     return ringbuffer_sc_do_dequeue(r, obj_p, 1);
 }
 
-/**
- * Test if a ring buffer is full.
+/* Test if a ring buffer is full.
  *
  * @param r
  *   A pointer to the ring structure.
@@ -347,8 +337,7 @@ static inline bool ringbuf_is_full(const ringbuf_t *r)
     return ((cons_tail - prod_tail - 1) & r->prod.mask) == 0;
 }
 
-/**
- * Test if a ring buffer is empty.
+/* Test if a ring buffer is empty.
  *
  * @param r
  *   A pointer to the ring structure.
