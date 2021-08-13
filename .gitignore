@@ -21,6 +21,7 @@ tpool/tpool
 list-move/bench-lock
 list-move/bench-lockfree
 hp_list/list
+lfring/lfring
 
 # external source files
 preempt_sched/list.h

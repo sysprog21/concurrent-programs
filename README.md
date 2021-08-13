@@ -14,10 +14,11 @@ purpose of these programs is to be illustrative and educational.
 * [Producer–consumer problem](https://en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem)
     - [spmc](spmc/): A concurrent single-producer/multiple-consumer queue.
     - [mpsc](mpsc/): An unbounded lockless single-consumer/multiple-producer FIFO queue.
-    - [mpmc](mpmc/): A multiple-producer/multiple-consumer (MPMC) queue.
+    - [mpmc](mpmc/): A multiple-producer/multiple-consumer (MPMC) queue using Linux futex.
     - [channel](channel/): A Linux futex based Go channel implementation.
 * [Lock-Free](https://en.wikipedia.org/wiki/Non-blocking_algorithm) Data Structure
     - [ringbuffer](ringbuffer/): A lock-less ring buffer.
+    - [lfring](lfring/): A lock-free multiple-producer/multiple-consumer (MPMC) ring buffer.
     - [ringbuf\_shm](ringbuf-shm/): An optimized lock-free ring buffer with shared memory.
     - [mbus](mbus/): A concurrent message bus.
 * [Synchronization](https://en.wikipedia.org/wiki/Synchronization_(computer_science))
