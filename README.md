@@ -6,6 +6,7 @@ purpose of these programs is to be illustrative and educational.
 
 ## Project Listing
 * [Coroutine](https://en.wikipedia.org/wiki/Coroutine)
+    - [coro](coro/): A coroutine implementation with setjmp/longjmp.
     - [tinync](tinync/): A tiny `nc` implementation using coroutine.
     - [fiber](fiber/): A user-level thread (fiber) using `clone` system call.
     - [preempt\_sched](preempt_sched/): A preemptive userspace multitasking based on a SIGALRM signal.
