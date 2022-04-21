@@ -149,7 +149,7 @@ no_increment:
             if (node != spmc->curr_enqueue)
                 atomic_compare_exchange_strong(
                     &spmc->curr_dequeue, &node,
-                    atomic_load_explicit(&node->next, memory_order_relaxed));
+                    atomic_load_explicit(&node->next, memory_order_consume));
             goto no_increment;
         } else
             *slot = node->buf[INDEX_OF(idx, node)];
