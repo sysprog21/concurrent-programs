@@ -80,6 +80,6 @@ $ nc -l 127.0.0.1 9000
 ```
 Then launch `tinync` in `T2`:
 ```shell
-$ tinync 127.0.0.1 9000
+$ ./tinync 127.0.0.1 9000
 ```
 Now, any words typed in `T1` will be recived and presented in `T2`, and vice versa.
