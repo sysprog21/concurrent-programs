@@ -31,6 +31,7 @@ purpose of these programs is to be illustrative and educational.
     - [qsbr](qsbr/): An implementation of Quiescent state based reclamation (QSBR).
     - [list-move](list-move/): Evaluation of two concurrent linked lists: QSBR and lock-based.
     - [rcu\_queue](rcu_queue/): An efficient concurrent queue based on QSBR.
+    - [thread-rcu](thread-rcu/): A Linux Kernel style thread-based simple RCU.
 * Applications
     - [httpd](httpd/): A multi-threaded web server.
     - [map-reduce](map-reduce/): word counting using MapReduce.
