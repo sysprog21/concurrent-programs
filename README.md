@@ -16,6 +16,7 @@ purpose of these programs is to be illustrative and educational.
     - [spmc](spmc/): A concurrent single-producer/multiple-consumer queue.
     - [mpsc](mpsc/): An unbounded lockless single-consumer/multiple-producer FIFO queue.
     - [mpmc](mpmc/): A multiple-producer/multiple-consumer (MPMC) queue using Linux futex.
+    - [lf-queue](lf-queue/): A bounded lock-free queue.
     - [channel](channel/): A Linux futex based Go channel implementation.
 * [Lock-Free](https://en.wikipedia.org/wiki/Non-blocking_algorithm) Data Structure
     - [ringbuffer](ringbuffer/): A lock-less ring buffer.
