@@ -23,6 +23,8 @@ list-move/bench-lockfree
 hp_list/list
 lfring/lfring
 hashmap/test-hashmap
+coro/coro
+lf-queue/test
 
 # external source files
 preempt_sched/list.h
