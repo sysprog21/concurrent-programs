@@ -71,7 +71,7 @@ static void *reader_func(void *argv)
         if (tmp->count != old_prev_count)
             atomic_fetch_add_explicit(&gp_idx, 1, memory_order_release);
         if (atomic_load_explicit(&gp_idx, memory_order_acquire) >
-            N_UPDATE_RUN + 1) {
+            N_UPDATE_RUN) {
             fprintf(stderr, "grace period index (%u) is over bound (%u).\n",
                     atomic_load_explicit(&gp_idx, memory_order_acquire),
                     N_UPDATE_RUN);
