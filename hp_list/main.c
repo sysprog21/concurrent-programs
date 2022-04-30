@@ -234,7 +234,7 @@ void list_hp_retire(list_hp_t *hp, uintptr_t ptr)
     if (rl->size < HP_THRESHOLD_R)
         return;
 
-    for (size_t iret = 0; iret < rl->size; iret++) {
+    for (size_t iret = 0; iret < rl->size;) {
         uintptr_t obj = rl->list[iret];
         bool can_delete = true;
         for (int itid = 0; itid < HP_MAX_THREADS && can_delete; itid++) {
@@ -251,6 +251,8 @@ void list_hp_retire(list_hp_t *hp, uintptr_t ptr)
             memmove(&rl->list[iret], &rl->list[iret + 1], bytes);
             rl->size--;
             hp->deletefunc((void *) obj);
+        } else {
+            iret++;
         }
     }
 }
