@@ -23,6 +23,7 @@ static inline void thread_barrier(struct barrier_struct *b, size_t n)
     pthread_mutex_lock(&b->lock);
     b->count++;
     if (b->count == n) {
+        b->count = 0;
         pthread_mutex_unlock(&b->lock);
         atomic_store_explicit(&b->flag, local_sense, memory_order_release);
     } else {

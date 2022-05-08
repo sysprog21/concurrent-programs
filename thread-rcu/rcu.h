@@ -75,32 +75,32 @@ static inline void spin_unlock(spinlock_t *sp)
                               memory_order_relaxed);                        \
     } while (0)
 
-#define smp_store_release(x, val)                                           \
-    do {                                                                    \
-        atomic_store_explicit((volatile _Atomic __typeof__(x) *) &x, (val), \
-                              memory_order_release);                        \
+#define smp_store_release(x, val)                                             \
+    do {                                                                      \
+        __typeof__(*x) ___x;                                                  \
+        atomic_store_explicit((volatile _Atomic __typeof__(___x) *) x, (val), \
+                              memory_order_release);                          \
     } while (0)
 
-#define atomic_fetch_add_release(x, v)                       \
-    ({                                                       \
-        __typeof__(*x) __a_a_r_x;                            \
-        atomic_fetch_add_explicit(                           \
-            (volatile _Atomic __typeof__(__a_a_r_x) *) x, v, \
-            memory_order_release);                           \
+#define atomic_fetch_add_release(x, v)                                        \
+    ({                                                                        \
+        __typeof__(*x) ___x;                                                  \
+        atomic_fetch_add_explicit((volatile _Atomic __typeof__(___x) *) x, v, \
+                                  memory_order_release);                      \
     })
 
-#define atomic_fetch_or_release(x, v)                                          \
-    ({                                                                         \
-        __typeof__(*x) __a_r_r_x;                                              \
-        atomic_fetch_or_explicit((volatile _Atomic __typeof__(__a_r_r_x) *) x, \
-                                 v, memory_order_release);                     \
+#define atomic_fetch_or_release(x, v)                                        \
+    ({                                                                       \
+        __typeof__(*x) ___x;                                                 \
+        atomic_fetch_or_explicit((volatile _Atomic __typeof__(___x) *) x, v, \
+                                 memory_order_release);                      \
     })
 
-#define atomic_xchg_release(x, v)                                              \
-    ({                                                                         \
-        __typeof__(*x) __a_c_r_x;                                              \
-        atomic_exchange_explicit((volatile _Atomic __typeof__(__a_c_r_x) *) x, \
-                                 v, memory_order_release);                     \
+#define atomic_xchg_release(x, v)                                            \
+    ({                                                                       \
+        __typeof__(*x) ___x;                                                 \
+        atomic_exchange_explicit((volatile _Atomic __typeof__(___x) *) x, v, \
+                                 memory_order_release);                      \
     })
 
 #include <errno.h>
@@ -140,7 +140,7 @@ static inline void spin_unlock(spinlock_t *sp)
  * to access it.
  */
 struct rcu_node {
-    unsigned int tid;
+    uintptr_t tid;
     uintptr_t __next_rcu_nesting;
 } __rcu_aligned;
 
@@ -163,12 +163,12 @@ struct rcu_data {
     } while (0)
 #define rcu_unset_nesting(np)                                          \
     do {                                                               \
-        smp_store_release((np)->__next_rcu_nesting,                    \
+        smp_store_release(&(np)->__next_rcu_nesting,                   \
                           READ_ONCE((np)->__next_rcu_nesting) & ~0x3); \
     } while (0)
 #define rcu_next(np) \
     ((struct rcu_node *) (READ_ONCE((np)->__next_rcu_nesting) & ~0x3))
-#define rcu_next_mask(nrn) ((struct rcu_node *) ((uintptr_t) (nrn) & ~0x3))
+#define rcu_next_mask(nrn) ((struct rcu_node *) ((uintptr_t)(nrn) & ~0x3))
 
 static struct rcu_data rcu_data = {
     .nr_thread = 0,
@@ -309,11 +309,11 @@ static inline void synchronize_rcu(void)
     smp_mb();
 }
 
-#define rcu_dereference(p)                                                 \
-    ({                                                                     \
-        __typeof__(*p) *__r_d_p = (__typeof__(*p) __force *) READ_ONCE(p); \
-        rcu_check_sparse(p, __rcu);                                        \
-        __r_d_p;                                                           \
+#define rcu_dereference(p)                                              \
+    ({                                                                  \
+        __typeof__(*p) *___p = (__typeof__(*p) __force *) READ_ONCE(p); \
+        rcu_check_sparse(p, __rcu);                                     \
+        ___p;                                                           \
     })
 
 #define rcu_assign_pointer(p, v)                                          \
