@@ -179,8 +179,10 @@ static void timer_handler(int signo, siginfo_t *info, ucontext_t *ctx)
 
 static void timer_init(void)
 {
-    struct sigaction sa = {.sa_handler = (void (*)(int)) timer_handler,
-                           .sa_flags = SA_SIGINFO};
+    struct sigaction sa = {
+        .sa_handler = (void (*)(int)) timer_handler,
+        .sa_flags = SA_SIGINFO,
+    };
     sigfillset(&sa.sa_mask);
     sigaction(SIGALRM, &sa, NULL);
 }
