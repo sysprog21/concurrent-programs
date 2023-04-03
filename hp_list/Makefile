@@ -4,9 +4,12 @@ CFLAGS += -fsanitize=thread
 LIBS = -lpthread
 BIN = list
 
-all: list
+all: list list2
 
 $(BIN): main.c
+	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
+
+list2: list2.c
 	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
 
 all: CFLAGS += -O2
@@ -21,4 +24,4 @@ indent:
 	clang-format -i *.[ch]
 
 clean:
-	rm -f $(BIN)
+	rm -f $(BIN) list2
