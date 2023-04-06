@@ -12,6 +12,7 @@ purpose of these programs is to be illustrative and educational.
     - [preempt\_sched](preempt_sched/): A preemptive userspace multitasking based on a SIGALRM signal.
 * Multi-threading Paradigms
     - [tpool](tpool/): A lightweight thread pool.
+    - [refcnt](refcnt/): A generic reference counting.
 * [Producer–consumer problem](https://en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem)
     - [spmc](spmc/): A concurrent single-producer/multiple-consumer queue.
     - [mpsc](mpsc/): An unbounded lockless single-consumer/multiple-producer FIFO queue.
