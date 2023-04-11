@@ -6,7 +6,6 @@
 #define _GNU_SOURCE
 #endif
 
-#include <malloc.h>
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -15,10 +14,10 @@
 
 #define PAGE_SIZE 4096     /* FIXME: avoid hard-coded */
 #define CACHE_LINE_SIZE 64 /* FIXME: make it configurable */
-#define CACHE_ALIGNED __attribute__((aligned(CACHE_LINE_SIZE)))
-#define DOUBLE_CACHE_ALIGNED __attribute__((aligned(2 * CACHE_LINE_SIZE)))
+#define __CACHE_ALIGNED __attribute__((aligned(CACHE_LINE_SIZE)))
+#define __DOUBLE___CACHE_ALIGNED __attribute__((aligned(2 * CACHE_LINE_SIZE)))
 
-static inline void *align_malloc(size_t align, size_t size)
+static inline void *align_alloc(size_t align, size_t size)
 {
     void *ptr;
     int ret = posix_memalign(&ptr, align, size);
@@ -30,32 +29,31 @@ static inline void *align_malloc(size_t align, size_t size)
 }
 
 #define N (1 << 12) /* node size */
-#define NBITS (N - 1)
+#define N_BITS (N - 1)
 
 typedef struct __node {
-    struct __node *volatile next DOUBLE_CACHE_ALIGNED;
-    long id DOUBLE_CACHE_ALIGNED;
-    void *volatile cells[N] DOUBLE_CACHE_ALIGNED;
+    struct __node *volatile next __DOUBLE___CACHE_ALIGNED;
+    long id __DOUBLE___CACHE_ALIGNED;
+    void *cells[N] __DOUBLE___CACHE_ALIGNED;
 } node_t;
 
-#define HANDLES 128 /* support 127 threads */
+#define N_HANDLES 128 /* support 127 threads */
 
 typedef struct {
     node_t *spare;
 
-    node_t *volatile put_node CACHE_ALIGNED;
-    node_t *volatile pop_node CACHE_ALIGNED;
+    node_t *volatile push __CACHE_ALIGNED;
+    node_t *volatile pop __CACHE_ALIGNED;
 } handle_t;
 
 typedef struct {
     node_t *init_node;
-    volatile long init_id DOUBLE_CACHE_ALIGNED;
+    volatile long init_id __DOUBLE___CACHE_ALIGNED;
 
-    volatile long put_index DOUBLE_CACHE_ALIGNED;
-    volatile long pop_index DOUBLE_CACHE_ALIGNED;
+    volatile long put_index __DOUBLE___CACHE_ALIGNED;
+    volatile long pop_index __DOUBLE___CACHE_ALIGNED;
 
-    handle_t *volatile enq_handles[HANDLES];
-    handle_t *volatile deq_handles[HANDLES];
+    handle_t *enqueue_handles[N_HANDLES], *dequeue_handles[N_HANDLES];
 
     int threshold;
 
@@ -64,24 +62,24 @@ typedef struct {
 
 static inline node_t *mpmc_new_node()
 {
-    node_t *n = align_malloc(PAGE_SIZE, sizeof(node_t));
+    node_t *n = align_alloc(PAGE_SIZE, sizeof(node_t));
     memset(n, 0, sizeof(node_t));
     return n;
 }
 
 enum queue_ops {
-    ENQ = 1 << 1,
-    DEQ = 1 << 0,
+    DEQUEUE = 1 << 0,
+    ENQUEUE = 1 << 1,
 };
 
 /* register the enqueuers first, dequeuers second. */
 void mpmc_queue_register(mpmc_t *q, handle_t *th, int flag)
 {
     th->spare = mpmc_new_node();
-    th->put_node = th->pop_node = q->init_node;
+    th->push = th->pop = q->init_node;
 
-    if (flag & ENQ) {
-        handle_t **tail = q->enq_handles;
+    if (flag & ENQUEUE) {
+        handle_t **tail = q->enqueue_handles;
         for (int i = 0;; ++i) {
             handle_t *init = NULL;
             if (!tail[i] &&
@@ -93,8 +91,8 @@ void mpmc_queue_register(mpmc_t *q, handle_t *th, int flag)
         pthread_barrier_wait(&q->enq_barrier);
     }
 
-    if (flag & DEQ) {
-        handle_t **tail = q->deq_handles;
+    if (flag & DEQUEUE) {
+        handle_t **tail = q->dequeue_handles;
         for (int i = 0;; ++i) {
             handle_t *init = NULL;
             if (!tail[i] &&
@@ -157,10 +155,10 @@ static void *mpmc_find_cell(node_t *volatile *ptr, long i, handle_t *th)
     *ptr = curr; /* update our node to the present node */
 
     /* Orders processor execution, so other thread can see the '*ptr = curr' */
-    __asm("sfence" ::: "cc", "memory"); /* FIXME: x86-only */
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
 
     /* now we get the needed cell, its' node is curr and index is i % N */
-    return &curr->cells[i & NBITS];
+    return &curr->cells[i & N_BITS];
 }
 
 #include <linux/futex.h>
@@ -183,8 +181,7 @@ void mpmc_enqueue(mpmc_t *q, handle_t *th, void *v)
 {
     /* return the needed index */
     void *volatile *c = mpmc_find_cell(
-        &th->put_node, __atomic_fetch_add(&q->put_index, 1, __ATOMIC_SEQ_CST),
-        th);
+        &th->push, __atomic_fetch_add(&q->put_index, 1, __ATOMIC_SEQ_CST), th);
     /* __atomic_fetch_add(ptr, val) is an atomic fetch-and-add that also
      * ensures sequential consistency
      */
@@ -214,7 +211,7 @@ void *mpmc_dequeue(mpmc_t *q, handle_t *th)
     long index = __atomic_fetch_add(&q->pop_index, 1, __ATOMIC_SEQ_CST);
 
     /* locate the needed cell */
-    void *volatile *c = mpmc_find_cell(&th->pop_node, index, th);
+    void *volatile *c = mpmc_find_cell(&th->pop, index, th);
 
     /* because the queue is a blocking queue, so we just use more spin. */
     int times = (1 << 20);
@@ -222,7 +219,11 @@ void *mpmc_dequeue(mpmc_t *q, handle_t *th)
         cv = *c;
         if (cv)
             goto over;
-        __asm__("pause"); /* FIXME: x86-only */
+#if defined(__i386__) || defined(__x86_64__)
+        __asm__ __volatile__("pause");
+#elif defined(__aarch64__) || defined(__arm__)
+        __asm__ __volatile__("isb\n");
+#endif
     } while (times-- > 0);
 
     /* XCHG, if return NULL so this cell is NULL, we just wait and observe the
@@ -236,20 +237,20 @@ void *mpmc_dequeue(mpmc_t *q, handle_t *th)
             mpmc_futex_wait(&futex_addr, 1);
         } while (futex_addr == 1);
 
-        /* the counterpart put thread has change futex_addr's value to 0. and the
-         * data has into cell(c).
+        /* the counterpart put thread has change futex_addr's value to 0. and
+         * the data has into cell(c).
          */
         cv = *c;
     }
 
 over:
-    /* if the index is the node's last cell: (NBITS == 4095), it Try to reclaim
+    /* if the index is the node's last cell: (N_BITS == 4095), it Try to reclaim
      * the memory. so we just take the smallest ID node that is not
      * reclaimed(init_node), and At the same time, by traversing the local data
      * of other threads, we get a larger ID node(min_node). So it is safe to
      * recycle the memory [init_node, min_node).
      */
-    if ((index & NBITS) == NBITS) {
+    if ((index & N_BITS) == N_BITS) {
         /* __atomic_load_n(ptr, __ATOMIC_ACQUIRE) is a load with a following
          * acquire fence to ensure no following load and stores can start before
          * the current load completes.
@@ -260,33 +261,32 @@ over:
          * __ATOMIC_RELAXED) is an atomic compare-and-swap that ensures acquire
          * semantic when succeed or relaxed semantic when failed.
          */
-        if ((th->pop_node->id - init_index) >= q->threshold &&
-            init_index >= 0 &&
+        if ((th->pop->id - init_index) >= q->threshold && init_index >= 0 &&
             __atomic_compare_exchange_n(&q->init_id, &init_index, -1, 0,
                                         __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
             node_t *init_node = q->init_node;
-            th = q->deq_handles[0];
-            node_t *min_node = th->pop_node;
+            th = q->dequeue_handles[0];
+            node_t *min_node = th->pop;
 
             int i;
-            handle_t *next = q->deq_handles[i = 1];
+            handle_t *next = q->dequeue_handles[i = 1];
             while (next) {
-                node_t *next_min = next->pop_node;
+                node_t *next_min = next->pop;
                 if (next_min->id < min_node->id)
                     min_node = next_min;
                 if (min_node->id <= init_index)
                     break;
-                next = q->deq_handles[++i];
+                next = q->dequeue_handles[++i];
             }
 
-            next = q->enq_handles[i = 0];
+            next = q->enqueue_handles[i = 0];
             while (next) {
-                node_t *next_min = next->put_node;
+                node_t *next_min = next->push;
                 if (next_min->id < min_node->id)
                     min_node = next_min;
                 if (min_node->id <= init_index)
                     break;
-                next = q->enq_handles[++i];
+                next = q->enqueue_handles[++i];
             }
 
             long new_id = min_node->id;
@@ -322,33 +322,32 @@ static pthread_barrier_t prod_barrier, cons_barrier;
 static void *producer(void *index)
 {
     mpmc_t *q = &mpmc;
-    handle_t *th = malloc(sizeof(handle_t));
-    memset(th, 0, sizeof(handle_t));
-    mpmc_queue_register(q, th, ENQ);
+    handle_t *th = calloc(1, sizeof(handle_t));
+    mpmc_queue_register(q, th, ENQUEUE);
 
     for (;;) {
         pthread_barrier_wait(&prod_barrier);
         for (int i = 0; i < COUNTS_PER_THREAD; ++i)
-            mpmc_enqueue(q, th, 1 + i + ((int) index) * COUNTS_PER_THREAD);
+            mpmc_enqueue(
+                q, th, (void *) 1 + i + ((intptr_t) index) * COUNTS_PER_THREAD);
         pthread_barrier_wait(&prod_barrier);
     }
     return NULL;
 }
 
-#define THREAD_NUM 4
+#define N_THREADS 4
 static bool *array;
 static void *consumer(void *index)
 {
     mpmc_t *q = &mpmc;
-    handle_t *th = malloc(sizeof(handle_t));
-    memset(th, 0, sizeof(handle_t));
-    mpmc_queue_register(q, th, DEQ);
+    handle_t *th = calloc(1, sizeof(handle_t));
+    mpmc_queue_register(q, th, DEQUEUE);
 
     for (;;) {
         pthread_barrier_wait(&cons_barrier);
         for (long i = 0; i < COUNTS_PER_THREAD; ++i) {
             int value;
-            if (!(value = mpmc_dequeue(q, th)))
+            if (!(value = (intptr_t) mpmc_dequeue(q, th)))
                 return NULL;
             array[value] = true;
         }
@@ -361,24 +360,25 @@ static void *consumer(void *index)
 
 int main(int argc, char *argv[])
 {
-    pthread_barrier_init(&prod_barrier, NULL, THREAD_NUM + 1);
-    pthread_barrier_init(&cons_barrier, NULL, THREAD_NUM + 1);
+    pthread_barrier_init(&prod_barrier, NULL, N_THREADS + 1);
+    pthread_barrier_init(&cons_barrier, NULL, N_THREADS + 1);
     if (argc >= 3) {
         COUNTS_PER_THREAD = atol(argv[1]);
         threshold = atoi(argv[2]);
     }
 
-    printf("Amount: %ld\n", THREAD_NUM * COUNTS_PER_THREAD);
+    printf("Amount: %ld\n", N_THREADS * COUNTS_PER_THREAD);
     fflush(stdout);
-    array = malloc((1 + THREAD_NUM * COUNTS_PER_THREAD) * sizeof(bool));
-    memset(array, 0, (1 + THREAD_NUM * COUNTS_PER_THREAD) * sizeof(bool));
-    mpmc_init_queue(&mpmc, THREAD_NUM, THREAD_NUM, threshold);
+    array = calloc(1, (1 + N_THREADS * COUNTS_PER_THREAD) * sizeof(bool));
+    mpmc_init_queue(&mpmc, N_THREADS, N_THREADS, threshold);
 
-    pthread_t pids[THREAD_NUM];
+    pthread_t pids[N_THREADS];
 
-    for (int i = 0; i < THREAD_NUM; ++i) {
-        if (-1 == pthread_create(&pids[i], NULL, producer, i) ||
-            -1 == pthread_create(&pids[i], NULL, consumer, i)) {
+    for (int i = 0; i < N_THREADS; ++i) {
+        if (-1 == pthread_create(&pids[i], NULL, producer,
+                                 (void *) (intptr_t) i) ||
+            -1 == pthread_create(&pids[i], NULL, consumer,
+                                 (void *) (intptr_t) i)) {
             printf("error create thread\n");
             exit(1);
         }
@@ -388,7 +388,7 @@ int main(int argc, char *argv[])
         printf("\n#%d\n", i);
 
         pthread_barrier_wait(&cons_barrier);
-        sleep(1);
+        usleep(1e5);
 
         struct timeval start, prod_end;
         gettimeofday(&start, NULL);
@@ -398,7 +398,7 @@ int main(int argc, char *argv[])
         gettimeofday(&prod_end, NULL);
 
         bool verify = true;
-        for (int j = 1; j <= THREAD_NUM * COUNTS_PER_THREAD; ++j) {
+        for (int j = 1; j <= N_THREADS * COUNTS_PER_THREAD; ++j) {
             if (!array[j]) {
                 printf("Error: ints[%d]\n", j);
                 verify = false;
@@ -407,13 +407,13 @@ int main(int argc, char *argv[])
         }
         if (verify)
             printf("ints[1-%ld] have been verified through\n",
-                   THREAD_NUM * COUNTS_PER_THREAD);
+                   N_THREADS * COUNTS_PER_THREAD);
         float cost_time = (prod_end.tv_sec - start.tv_sec) +
                           (prod_end.tv_usec - start.tv_usec) / 1000000.0;
         printf("elapsed time: %f seconds\n", cost_time);
         printf("DONE #%d\n", i);
         fflush(stdout);
-        memset(array, 0, (1 + THREAD_NUM * COUNTS_PER_THREAD) * sizeof(bool));
+        memset(array, 0, (1 + N_THREADS * COUNTS_PER_THREAD) * sizeof(bool));
     }
     return 0;
 }
