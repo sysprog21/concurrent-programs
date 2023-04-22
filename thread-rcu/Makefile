@@ -1,6 +1,6 @@
 CFLAGS = -Wall
 CFLAGS += -g
-CFLAGS += -std=c11
+CFLAGS += -std=gnu11
 CFLAGS += -D'N_READERS=100'
 CFLAGS += -D'N_UPDATE_RUN=5'
 CFLAGS += -fsanitize=thread
