@@ -168,7 +168,7 @@ struct rcu_data {
     } while (0)
 #define rcu_next(np) \
     ((struct rcu_node *) (READ_ONCE((np)->__next_rcu_nesting) & ~0x3))
-#define rcu_next_mask(nrn) ((struct rcu_node *) ((uintptr_t)(nrn) & ~0x3))
+#define rcu_next_mask(nrn) ((struct rcu_node *) ((uintptr_t) (nrn) & ~0x3))
 
 static struct rcu_data rcu_data = {
     .nr_thread = 0,
