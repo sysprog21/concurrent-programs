@@ -29,7 +29,7 @@ purpose of these programs is to be illustrative and educational.
     - [lf-timer](lf-timer/): A lock-free timer.
 * [Synchronization](https://en.wikipedia.org/wiki/Synchronization_(computer_science))
     - [hp\_list](hp_list): A concurrent linked list utilizing Hazard Pointers.
-    - [rcu\_list](rcu_list/): A concurrent linked list utilizing the simplified RCU algorithm.
+    - [rcu-list](rcu-list/): A concurrent linked list utilizing the simplified RCU algorithm.
     - [qsbr](qsbr/): An implementation of Quiescent state based reclamation (QSBR).
     - [list-move](list-move/): Evaluation of two concurrent linked lists: QSBR and lock-based.
     - [rcu\_queue](rcu_queue/): An efficient concurrent queue based on QSBR.
