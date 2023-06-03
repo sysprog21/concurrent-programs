@@ -19,6 +19,7 @@ purpose of these programs is to be illustrative and educational.
     - [mpmc](mpmc/): A multiple-producer/multiple-consumer (MPMC) queue using Linux futex.
     - [lf-queue](lf-queue/): A bounded lock-free queue.
     - [channel](channel/): A Linux futex based Go channel implementation.
+    - [broadcast](broadcast/): A lock-free MPMC broadcast pub-sub queue.
 * [Lock-Free](https://en.wikipedia.org/wiki/Non-blocking_algorithm) Data Structure
     - [ringbuffer](ringbuffer/): A lock-less ring buffer.
     - [lfring](lfring/): A lock-free multiple-producer/multiple-consumer (MPMC) ring buffer.
