@@ -3,7 +3,7 @@ CFLAGS = -g
 CFLAGS += -Wall
 LDFLAGS += -lpthread
 CFLAGS += -std=c99
-# CFLAGS += -fsanitize=thread
+CFLAGS += -fsanitize=thread
 
 READER_NUM = 10
 UPDATER_NUM = 1
