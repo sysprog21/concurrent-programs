@@ -33,15 +33,12 @@ static struct test *test_alloc(int val)
 static void *reader_side(void *argv)
 {
     struct test __allow_unused *tmp;
-    struct list_head *node;
 
     rcu_init();
 
     rcu_read_lock();
 
-    list_for_each (node, &head) {
-        tmp = list_entry_rcu(node, struct test, node);
-    }
+    list_for_each_entry_rcu(tmp, &head, node) {}
 
     rcu_read_unlock();
 

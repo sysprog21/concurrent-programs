@@ -4,7 +4,10 @@
 
 #include <stddef.h>
 
-#include "thread-rcu.h"
+/* Reuse the RCU from thread-rcu */
+#include "../thread-rcu/rcu.h"
+
+#define __allow_unused __attribute__((unused))
 
 #define container_of(ptr, type, member)                         \
     __extension__({                                             \
@@ -63,6 +66,11 @@ static inline void list_del_rcu(struct list_head *node)
     list_init_rcu(node);
 }
 
+/*
+ * For the write side only (i.e., it should hold the lock when we use the
+ * non-rcu postfix for loop API).
+ */
+
 #define list_for_each(n, head) for (n = (head)->next; n != (head); n = n->next)
 
 #define list_for_each_from(pos, head) for (; pos != (head); pos = pos->next)
@@ -70,3 +78,10 @@ static inline void list_del_rcu(struct list_head *node)
 #define list_for_each_safe(pos, n, head)                   \
     for (pos = (head)->next, n = pos->next; pos != (head); \
          pos = n, n = pos->next)
+
+/* The read side should only use the following API. */
+
+#define list_for_each_entry_rcu(pos, head, member)                     \
+    for (pos = list_entry_rcu((head)->next, __typeof__(*pos), member); \
+         &pos->member != (head);                                       \
+         pos = list_entry_rcu(pos->member.next, __typeof__(*pos), member))
