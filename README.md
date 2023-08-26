@@ -29,7 +29,8 @@ purpose of these programs is to be illustrative and educational.
     - [hashmap](hashmap/): A concurrent hashmap implementation.
     - [lf-timer](lf-timer/): A lock-free timer.
 * [Synchronization](https://en.wikipedia.org/wiki/Synchronization_(computer_science))
-    - [hp\_list](hp_list): A concurrent linked list utilizing Hazard Pointers.
+    - [mcslock](mcslock/): MCS lock implementation.
+    - [hp\_list](hp_list)/: A concurrent linked list utilizing Hazard Pointers.
     - [rcu-list](rcu-list/): A concurrent linked list utilizing the simplified RCU algorithm.
     - [qsbr](qsbr/): An implementation of Quiescent state based reclamation (QSBR).
     - [list-move](list-move/): Evaluation of two concurrent linked lists: QSBR and lock-based.
