@@ -31,12 +31,13 @@ purpose of these programs is to be illustrative and educational.
 * [Synchronization](https://en.wikipedia.org/wiki/Synchronization_(computer_science))
     - [mcslock](mcslock/): An MCS lock implementation.
     - [seqlock](seqlock/): A seqlock (sequence lock) implementation.
-    - [hp\_list](hp_list)/: A concurrent linked list utilizing Hazard Pointers.
+    - [hp\_list](hp_list/)/: A concurrent linked list utilizing Hazard Pointers.
     - [rcu-list](rcu-list/): A concurrent linked list utilizing the simplified RCU algorithm.
     - [qsbr](qsbr/): An implementation of Quiescent state based reclamation (QSBR).
     - [list-move](list-move/): Evaluation of two concurrent linked lists: QSBR and lock-based.
     - [rcu\_queue](rcu_queue/): An efficient concurrent queue based on QSBR.
     - [thread-rcu](thread-rcu/): A Linux Kernel style thread-based simple RCU.
+    - [cmap](cmap/): A concurrent map implementation based on RCU.
 * Applications
     - [httpd](httpd/): A multi-threaded web server.
     - [map-reduce](map-reduce/): word counting using MapReduce.

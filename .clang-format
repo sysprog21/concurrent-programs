@@ -26,3 +26,6 @@ ForEachMacros:
   - rb_list_foreach_safe
   - EV_FOREACH
   - LIST_FOREACH
+  - LIST_FOREACH_POP
+  - MAP_FOREACH
+  - MAP_FOREACH_WITH_HASH
