@@ -13,6 +13,7 @@ purpose of these programs is to be illustrative and educational.
 * Multi-threading Paradigms
     - [tpool](tpool/): A lightweight thread pool.
     - [refcnt](refcnt/): A generic reference counting.
+    - [work-steal](work-steal/): A work-stealing scheduler.
 * [Producer–consumer problem](https://en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem)
     - [spmc](spmc/): A concurrent single-producer/multiple-consumer queue.
     - [mpsc](mpsc/): An unbounded lockless single-consumer/multiple-producer FIFO queue.
