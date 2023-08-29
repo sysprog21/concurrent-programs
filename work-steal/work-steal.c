@@ -51,7 +51,7 @@ static work_t *EMPTY = (work_t *) 0x100, *ABORT = (work_t *) 0x200;
 
 typedef struct {
     atomic_size_t size;
-    _Atomic work_t *buffer[];
+    _Atomic(work_t *) buffer[];
 } array_t;
 
 typedef struct {
