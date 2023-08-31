@@ -102,7 +102,7 @@ static inline void mutex_lock_at(struct mutex *mutex, const char *where)
         return;
     if (pthread_mutex_lock(&mutex->lock))
         abort_msg("pthread_mutex_lock fail");
-    mutex->where = where;
+    atomic_store_explicit(&mutex->where, where, memory_order_relaxed);
 }
 
 static inline void mutex_unlock(struct mutex *mutex)
@@ -111,7 +111,7 @@ static inline void mutex_unlock(struct mutex *mutex)
         return;
     if (pthread_mutex_unlock(&mutex->lock))
         abort_msg("pthread_mutex_unlock fail");
-    mutex->where = NULL;
+    atomic_store_explicit(&mutex->where, NULL, memory_order_relaxed);
 }
 
 static inline void cond_init(struct cond *cond)

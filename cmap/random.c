@@ -6,7 +6,8 @@
 #include "random.h"
 #include "util.h"
 
-static uint32_t seed = 0;
+/* Maintain thread-independent random seed to prevent race. */
+static __thread uint32_t seed = 0;
 
 static uint32_t random_next(void);
 

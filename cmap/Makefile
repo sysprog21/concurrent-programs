@@ -1,5 +1,11 @@
+CFLAGS = -Wall -O2
+
+ifeq ("$(TSAN)", "1")
+    CFLAGS += -g -fsanitize=thread
+endif
+
 all:
-	gcc -Wall -O2 -o test-cmap \
+	gcc $(CFLAGS) -o test-cmap \
 		cmap.c  random.c  rcu.c  test-cmap.c \
 		-lpthread
 

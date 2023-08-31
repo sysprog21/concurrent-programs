@@ -17,8 +17,10 @@
 struct elem {
     struct cmap_node node;
     uint32_t value;
+    struct elem *next;
 };
 
+static struct elem *freelist = NULL;
 static size_t num_values;
 static uint32_t max_value;
 static uint32_t *values;
@@ -67,6 +69,13 @@ static void destroy_values()
     struct elem *elem;
     free(values);
 
+    elem = freelist;
+    while (elem) {
+        struct elem *next = elem->next;
+        free(elem);
+        elem = next;
+    }
+
     cmap_state = cmap_state_acquire(&cmap_values);
     MAP_FOREACH (elem, node, cmap_state) {
         cmap_remove(&cmap_values, &elem->node);
@@ -107,11 +116,11 @@ static void *update_cmap(void *args)
     struct elem *elem;
     struct cmap_state cmap_state;
 
-    while (running) {
+    while (atomic_load_explicit(&running, memory_order_relaxed)) {
         /* Insert */
         uint32_t value = random_uint32() + max_value + 1;
         insert_value(value);
-        inserts++;
+        atomic_fetch_add_explicit(&inserts, 1, memory_order_relaxed);
         wait();
 
         /* Remove */
@@ -120,8 +129,16 @@ static void *update_cmap(void *args)
         MAP_FOREACH_WITH_HASH (elem, node, hash, cmap_state) {
             if (elem->value > max_value) {
                 cmap_remove(&cmap_values, &elem->node);
-                free(elem);
-                removes++;
+                /* FIXME: If we free 'elem' directly, it may lead to use-after-free
+                 * when the reader thread obtains it. To deal with the issue, here
+                 * we just simply keep it in a list and release the memory at the end
+                 * of program.
+                 *
+                 * We should consider better strategy like reference counting or hazard pointer,
+                 * which allow us to free each chunk of memory at the correct time */
+                elem->next = freelist;
+                freelist = elem;
+                atomic_fetch_add_explicit(&removes, 1, memory_order_relaxed);
                 break;
             }
         }
@@ -134,18 +151,18 @@ static void *update_cmap(void *args)
 /* Constantly check whever values in cmap can be composed */
 static void *read_cmap(void *args)
 {
-    while (running) {
+    while (atomic_load_explicit(&running, memory_order_relaxed)) {
         uint32_t index = random_uint32() % num_values;
         if (!can_compose_value(values[index])) {
-            running = false;
-            error = true;
+            atomic_store_explicit(&running, false, memory_order_relaxed);
+            atomic_store_explicit(&error, true, memory_order_relaxed);
             break;
         }
         atomic_fetch_add(&checks, 1);
         wait();
         if (can_compose_value(values[index] + max_value + 1)) {
-            running = false;
-            error = true;
+            atomic_store_explicit(&running, false, memory_order_relaxed);
+            atomic_store_explicit(&error, true, memory_order_relaxed);
             break;
         }
         atomic_fetch_add(&checks, 1);
@@ -187,13 +204,15 @@ int main(int argc, char **argv)
         printf(
             "#checks: %u, #inserts: %u, #removes: %u, "
             "cmap elements: %u, utilization: %.2lf \n",
-            (uint32_t) current_checks, inserts, removes,
+            (uint32_t) current_checks,
+            atomic_load_explicit(&inserts, memory_order_relaxed),
+            atomic_load_explicit(&removes, memory_order_relaxed),
             (uint32_t) cmap_size(&cmap_values), cmap_utilization(&cmap_values));
         usleep(250e3);
     }
 
     /* Stop threads */
-    running = false;
+    atomic_store_explicit(&running, false, memory_order_relaxed);
     for (int i = 0; i <= readers; ++i)
         pthread_join(threads[i], NULL);
 
