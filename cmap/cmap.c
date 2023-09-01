@@ -35,8 +35,8 @@ static void cmap_insert__(struct cmap_impl *impl, struct cmap_node *node)
     size_t i = node->hash & impl->max;
     node->next = impl->arr[i].first;
     if (!impl->arr[i].first)
-        impl->utilization++;
-    impl->arr[i].first = node;
+        atomic_fetch_add(&impl->utilization, 1);
+    atomic_store(&impl->arr[i].first, node);
 }
 
 static void cmap_destroy_callback(void *args)
@@ -142,7 +142,7 @@ double cmap_utilization(const struct cmap *cmap)
 {
     struct rcu *impl_rcu = rcu_acquire(cmap->impl->p);
     struct cmap_impl *impl = rcu_get(impl_rcu, struct cmap_impl *);
-    double res = (double) impl->utilization / (impl->max + 1);
+    double res = (double) atomic_load(&impl->utilization) / (impl->max + 1);
     rcu_release(impl_rcu);
     return res;
 }
@@ -182,7 +182,7 @@ size_t cmap_remove(struct cmap *cmap, struct cmap_node *node)
     struct cmap_node **node_p = &cmap_entry->first;
     while (*node_p) {
         if (*node_p == node) {
-            *node_p = node->next;
+            atomic_store(node_p, node->next);
             count--;
             break;
         }
@@ -214,12 +214,13 @@ struct cmap_cursor cmap_find__(struct cmap_state state, uint32_t hash)
 
     struct cmap_cursor cursor = {
         .entry_idx = hash & impl->max,
-        .node = impl->arr[hash & impl->max].first,
+        .node = atomic_load(&impl->arr[hash & impl->max].first),
         .next = NULL,
         .accross_entries = false,
     };
     if (cursor.node)
         cursor.next = cursor.node->next;
+
     return cursor;
 }
 
