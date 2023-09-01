@@ -23,12 +23,12 @@ static inline void wait_until_equal_u8(_Atomic uint8_t *loc,
         spin_wait();
 }
 
-void mcslock_init(_Atomic mcslock_t *lock)
+void mcslock_init(mcslock_t *lock)
 {
     atomic_init(lock, NULL);
 }
 
-void mcslock_acquire(_Atomic mcslock_t *lock, mcsnode_t *node)
+void mcslock_acquire(mcslock_t *lock, mcsnode_t *node)
 {
     atomic_init(&node->next, NULL);
     /* A0: Read and write lock, synchronized with A0/A1 */
@@ -48,7 +48,7 @@ void mcslock_acquire(_Atomic mcslock_t *lock, mcsnode_t *node)
     wait_until_equal_u8(&node->wait, MCS_PROCEED, memory_order_acquire);
 }
 
-void mcslock_release(_Atomic mcslock_t *lock, mcsnode_t *node)
+void mcslock_release(mcslock_t *lock, mcsnode_t *node)
 {
     mcsnode_t *next;
 

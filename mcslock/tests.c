@@ -4,7 +4,7 @@
 
 int main(void)
 {
-    _Atomic(mcslock_t) lock;
+    mcslock_t lock;
     mcsnode_t node;
     mcslock_init(&lock);
     mcslock_acquire(&lock, &node);
