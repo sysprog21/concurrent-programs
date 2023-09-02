@@ -1,13 +1,14 @@
 #pragma once
 
+#include <stdatomic.h>
 #include <stdint.h>
 
 typedef struct mcsnode {
-    struct mcsnode *next;
-    uint8_t wait;
+    _Atomic(struct mcsnode *) next;
+    _Atomic(uint8_t) wait;
 } mcsnode_t;
 
-typedef mcsnode_t *mcslock_t;
+typedef _Atomic(mcsnode_t*) mcslock_t;
 
 /* Initialize an MCS lock */
 void mcslock_init(mcslock_t *lock);
