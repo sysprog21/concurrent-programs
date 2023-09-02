@@ -10,37 +10,43 @@
 
 #define SEQLOCK_WRITER 1U
 
-#if defined(__i386__) || defined(__x86_64__) || defined(__aarch64__)
+#if defined(__i386__) || defined(__x86_64__)
 #define spin_wait() atomic_thread_fence(memory_order_seq_cst)
+#elif defined(__aarch64__)
+#define spin_wait() __asm__ __volatile__("isb\n")
 #else
 #define spin_wait() ((void) 0)
 #endif
 
+#if defined(__aarch64__)
 #define SEVL() sevl()
 static inline void sevl(void)
 {
-    atomic_thread_fence(memory_order_seq_cst);
+    __asm__ volatile("sevl" : : :);
 }
 #define WFE() wfe()
 static inline int wfe(void)
 {
-    atomic_thread_fence(memory_order_seq_cst);
+    __asm__ volatile("wfe" : : : "memory");
     return 1;
 }
 #define LDX(a, b) ldx((a), (b))
-static inline uint32_t ldx(const _Atomic uint32_t *var, int mm)
+static inline uint32_t ldx(const uint8_t *var, int mm)
 {
     uint32_t old;
-
     if (mm == memory_order_acquire)
-        old = atomic_load_explicit(var, memory_order_acquire);
+        __asm volatile("ldaxrb %w0, [%1]" : "=&r"(old) : "r"(var) : "memory");
     else if (mm == memory_order_relaxed)
-        old = atomic_load_explicit(var, memory_order_relaxed);
+        __asm volatile("ldxrb %w0, [%1]" : "=&r"(old) : "r"(var) : "memory");
     else
         abort();
-
     return old;
 }
+#else /* generic */
+#define SEVL() (void) 0
+#define WFE() 1
+#define LDX(a, b) atomic_load_explicit((a), (b))
+#endif
 
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 
