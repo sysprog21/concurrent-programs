@@ -1,10 +1,11 @@
 #pragma once
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-typedef uint32_t seqlock_t;
+typedef _Atomic(uint32_t) seqlock_t;
 
 /* Initialise a seqlock aka reader/writer synchronization */
 void seqlock_init(seqlock_t *sync);

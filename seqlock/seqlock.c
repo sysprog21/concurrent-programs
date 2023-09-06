@@ -1,7 +1,9 @@
 #include <assert.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "seqlock.h"
@@ -9,7 +11,7 @@
 #define SEQLOCK_WRITER 1U
 
 #if defined(__i386__) || defined(__x86_64__)
-#define spin_wait() __builtin_ia32_pause()
+#define spin_wait() atomic_thread_fence(memory_order_seq_cst)
 #elif defined(__aarch64__)
 #define spin_wait() __asm__ __volatile__("isb\n")
 #else
@@ -32,9 +34,9 @@ static inline int wfe(void)
 static inline uint32_t ldx(const uint8_t *var, int mm)
 {
     uint32_t old;
-    if (mm == __ATOMIC_ACQUIRE)
+    if (mm == memory_order_acquire)
         __asm volatile("ldaxrb %w0, [%1]" : "=&r"(old) : "r"(var) : "memory");
-    else if (mm == __ATOMIC_RELAXED)
+    else if (mm == memory_order_relaxed)
         __asm volatile("ldxrb %w0, [%1]" : "=&r"(old) : "r"(var) : "memory");
     else
         abort();
@@ -43,7 +45,7 @@ static inline uint32_t ldx(const uint8_t *var, int mm)
 #else /* generic */
 #define SEVL() (void) 0
 #define WFE() 1
-#define LDX(a, b) __atomic_load_n((a), (b))
+#define LDX(a, b) atomic_load_explicit((a), (b))
 #endif
 
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
@@ -57,7 +59,8 @@ static inline seqlock_t wait_for_no_writer(const seqlock_t *sync, int mo)
 {
     seqlock_t l;
     SEVL(); /* Do SEVL early to avoid excessive loop alignment (NOPs) */
-    if (UNLIKELY(((l = __atomic_load_n(sync, mo)) & SEQLOCK_WRITER) != 0)) {
+    if (UNLIKELY(((l = atomic_load_explicit(sync, mo)) & SEQLOCK_WRITER) !=
+                 0)) {
         while (WFE() && ((l = LDX(sync, mo)) & SEQLOCK_WRITER) != 0)
             spin_wait();
     }
@@ -69,7 +72,7 @@ seqlock_t seqlock_acquire_rd(const seqlock_t *sync)
 {
     /* Wait for any present writer to go away */
     /* B: Synchronize with A */
-    return wait_for_no_writer(sync, __ATOMIC_ACQUIRE);
+    return wait_for_no_writer(sync, memory_order_acquire);
 }
 
 bool seqlock_release_rd(const seqlock_t *sync, seqlock_t prv)
@@ -77,9 +80,9 @@ bool seqlock_release_rd(const seqlock_t *sync, seqlock_t prv)
     /* Enforce Load/Load order as if synchronizing with a store-release or
      * fence-release in another thread.
      */
-    __atomic_thread_fence(__ATOMIC_ACQUIRE);
+    atomic_thread_fence(memory_order_acquire);
     /* Test if sync remains unchanged => success */
-    return __atomic_load_n(sync, __ATOMIC_RELAXED) == prv;
+    return atomic_load_explicit(sync, memory_order_relaxed) == prv;
 }
 
 void seqlock_acquire_wr(seqlock_t *sync)
@@ -87,17 +90,17 @@ void seqlock_acquire_wr(seqlock_t *sync)
     seqlock_t l;
     do {
         /* Wait for any present writer to go away */
-        l = wait_for_no_writer(sync, __ATOMIC_RELAXED);
+        l = wait_for_no_writer(sync, memory_order_relaxed);
         /* Attempt to increment, setting writer flag */
     } while (
         /* C: Synchronize with A */
-        !__atomic_compare_exchange_n(sync, &l, l + SEQLOCK_WRITER,
-                                     /*weak=*/true, __ATOMIC_ACQUIRE,
-                                     __ATOMIC_RELAXED));
+        !atomic_compare_exchange_strong_explicit(
+            sync, (uint32_t *) &l, l + SEQLOCK_WRITER, memory_order_acquire,
+            memory_order_relaxed));
     /* Enforce Store/Store order as if synchronizing with a load-acquire or
      * fence-acquire in another thread.
      */
-    __atomic_thread_fence(__ATOMIC_RELEASE);
+    atomic_thread_fence(memory_order_release);
 }
 
 void seqlock_release_wr(seqlock_t *sync)
@@ -110,17 +113,19 @@ void seqlock_release_wr(seqlock_t *sync)
 
     /* Increment, clearing writer flag */
     /* A: Synchronize with B and C */
-    __atomic_store_n(sync, cur + 1, __ATOMIC_RELEASE);
+    atomic_store_explicit(sync, cur + SEQLOCK_WRITER, memory_order_release);
 }
 
-#define ATOMIC_COPY(_d, _s, _sz, _type)                                      \
-    ({                                                                       \
-        _type val = __atomic_load_n((const _type *) (_s), __ATOMIC_RELAXED); \
-        _s += sizeof(_type);                                                 \
-        __atomic_store_n((_type *) (_d), val, __ATOMIC_RELAXED);             \
-        _d += sizeof(_type);                                                 \
-        _sz -= sizeof(_type);                                                \
-    })
+#define ATOMIC_COPY(_d, _s, _sz, _type)                                     \
+    do {                                                                    \
+        const _Atomic _type *src_atomic = (_Atomic const _type *) (_s);     \
+        _type val = atomic_load_explicit(src_atomic, memory_order_relaxed); \
+        _s += sizeof(_type);                                                \
+        _Atomic _type *dst_atomic = (_Atomic _type *) (_d);                 \
+        atomic_store_explicit(dst_atomic, val, memory_order_relaxed);       \
+        _d += sizeof(_type);                                                \
+        _sz -= sizeof(_type);                                               \
+    } while (0)
 
 static inline void atomic_memcpy(char *dst, const char *src, size_t sz)
 {
