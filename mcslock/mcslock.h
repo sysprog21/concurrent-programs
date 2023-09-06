@@ -8,7 +8,7 @@ typedef struct mcsnode {
     _Atomic(uint8_t) wait;
 } mcsnode_t;
 
-typedef _Atomic(mcsnode_t*) mcslock_t;
+typedef _Atomic(mcsnode_t *) mcslock_t;
 
 /* Initialize an MCS lock */
 void mcslock_init(mcslock_t *lock);

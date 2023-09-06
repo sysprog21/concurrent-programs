@@ -129,13 +129,14 @@ static void *update_cmap(void *args)
         MAP_FOREACH_WITH_HASH (elem, node, hash, cmap_state) {
             if (elem->value > max_value) {
                 cmap_remove(&cmap_values, &elem->node);
-                /* FIXME: If we free 'elem' directly, it may lead to use-after-free
-                 * when the reader thread obtains it. To deal with the issue, here
-                 * we just simply keep it in a list and release the memory at the end
-                 * of program.
+                /* FIXME: If we free 'elem' directly, it may lead to
+                 * use-after-free when the reader thread obtains it. To deal
+                 * with the issue, here we just simply keep it in a list and
+                 * release the memory at the end of program.
                  *
-                 * We should consider better strategy like reference counting or hazard pointer,
-                 * which allow us to free each chunk of memory at the correct time */
+                 * We should consider better strategy like reference counting or
+                 * hazard pointer, which allow us to free each chunk of memory
+                 * at the correct time */
                 elem->next = freelist;
                 freelist = elem;
                 atomic_fetch_add_explicit(&removes, 1, memory_order_relaxed);
