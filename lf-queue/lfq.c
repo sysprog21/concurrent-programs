@@ -1,8 +1,10 @@
 #include <assert.h>
 #include <errno.h>
+#include <stdatomic.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
 
-#include "atomics.h"
 #include "lfq.h"
 
 #define MAX_FREE 150
@@ -20,14 +22,14 @@ static bool in_hp(struct lfq_ctx *ctx, struct lfq_node *node)
 static void insert_pool(struct lfq_ctx *ctx, struct lfq_node *node)
 {
     atomic_store(&node->free_next, NULL);
-    struct lfq_node *old_tail = XCHG(&ctx->fpt, node); /* seq_cst */
+    struct lfq_node *old_tail = atomic_exchange(&ctx->fpt, node); /* seq_cst */
     atomic_store(&old_tail->free_next, node);
 }
 
 static void free_pool(struct lfq_ctx *ctx, bool freeall)
 {
     bool old = 0;
-    if (!CAS(&ctx->is_freeing, &old, 1))
+    if (!atomic_compare_exchange_strong(&ctx->is_freeing, &old, 1))
         return;
 
     for (int i = 0; i < MAX_FREE || freeall; i++) {
@@ -39,7 +41,7 @@ static void free_pool(struct lfq_ctx *ctx, bool freeall)
         free(p);
     }
     atomic_store(&ctx->is_freeing, false);
-    smp_mb();
+    atomic_thread_fence(memory_order_seq_cst);
 }
 
 static void safe_free(struct lfq_ctx *ctx, struct lfq_node *node)
@@ -47,12 +49,12 @@ static void safe_free(struct lfq_ctx *ctx, struct lfq_node *node)
     if (atomic_load(&node->can_free) && !in_hp(ctx, node)) {
         /* free is not thread-safe */
         bool old = 0;
-        if (CAS(&ctx->is_freeing, &old, 1)) {
+        if (atomic_compare_exchange_strong(&ctx->is_freeing, &old, 1)) {
             /* poison the pointer to detect use-after-free */
             node->next = (void *) -1;
             free(node); /* we got the lock; actually free */
             atomic_store(&ctx->is_freeing, false);
-            smp_mb();
+            atomic_thread_fence(memory_order_seq_cst);
         } else /* we did not get the lock; only add to a freelist */
             insert_pool(ctx, node);
     } else
@@ -65,7 +67,7 @@ static int alloc_tid(struct lfq_ctx *ctx)
     for (int i = 0; i < ctx->MAX_HP_SIZE; i++) {
         if (ctx->tid_map[i] == 0) {
             int old = 0;
-            if (CAS(&ctx->tid_map[i], &old, 1))
+            if (atomic_compare_exchange_strong(&ctx->tid_map[i], &old, 1))
                 return i;
         }
     }
@@ -141,7 +143,7 @@ int lfq_enqueue(struct lfq_ctx *ctx, void *data)
         return -errno;
 
     insert_node->data = data;
-    struct lfq_node *old_tail = XCHG(&ctx->tail, insert_node);
+    struct lfq_node *old_tail = atomic_exchange(&ctx->tail, insert_node);
     /* We have claimed our spot in the insertion order by modifying tail.
      * we are the only inserting thread with a pointer to the old tail.
      *
@@ -162,13 +164,13 @@ void *lfq_dequeue_tid(struct lfq_ctx *ctx, int tid)
     /* HP[tid] is necessary for deallocation. */
     do {
     retry:
-        /* continue jumps to the bottom of the loop, and would attempt a CAS
-         * with uninitialized new_head.
+        /* continue jumps to the bottom of the loop, and would attempt a
+         * atomic_compare_exchange_strong with uninitialized new_head.
          */
         old_head = atomic_load(&ctx->head);
 
         atomic_store(&ctx->HP[tid], old_head);
-        mb();
+        atomic_thread_fence(memory_order_seq_cst);
 
         /* another thread freed it before seeing our HP[tid] store */
         if (old_head != atomic_load(&ctx->head))
@@ -179,7 +181,7 @@ void *lfq_dequeue_tid(struct lfq_ctx *ctx, int tid)
             atomic_store(&ctx->HP[tid], 0);
             return NULL; /* never remove the last node */
         }
-    } while (!CAS(&ctx->head, &old_head, new_head));
+    } while (!atomic_compare_exchange_strong(&ctx->head, &old_head, new_head));
 
     /* We have atomically advanced head, and we are the thread that won the race
      * to claim a node. We return the data from the *new* head. The list starts
@@ -191,7 +193,7 @@ void *lfq_dequeue_tid(struct lfq_ctx *ctx, int tid)
     atomic_store(&new_head->can_free, true);
 
     /* we need to avoid freeing until other readers are definitely not going to
-     * load its ->next in the CAS loop
+     * load its ->next in the atomic_compare_exchange_strong loop
      */
     safe_free(ctx, (struct lfq_node *) old_head);
 
