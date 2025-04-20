@@ -104,6 +104,7 @@ void task0(void *arg)
     }
 
     printf("%s: complete\n", task->task_name);
+    free(task);
     longjmp(sched, 1);
 }
 
@@ -135,6 +136,7 @@ void task1(void *arg)
     }
 
     printf("%s: complete\n", task->task_name);
+    free(task);
     longjmp(sched, 1);
 }
 
