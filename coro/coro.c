@@ -137,7 +137,6 @@ void task1(void *arg)
 
     printf("%s: complete\n", task->task_name);
     free(task);
-    longjmp(sched, 1);
 }
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
