@@ -1,0 +1,23 @@
+coro/coro.c
+  d8e7fa0057f1b000 140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "e04b9c3654043276f523a50b9f29fd7d135d5809",
+  "prompts": {
+    "d8e7fa0057f1b000": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "51e0c16d-7510-401e-8be9-aab262a18c8a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Jim Huang <jserv@ccns.ncku.edu.tw>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
