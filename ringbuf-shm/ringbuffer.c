@@ -10,10 +10,13 @@
 #include <time.h>
 #include <unistd.h>
 
-#define RINGBUF_PAD(SIZE) (((size_t)(SIZE) + 7U) & (~7U))
+#define RINGBUF_PAD(SIZE) \
+    (((size_t) (SIZE) + 7U) & (~7U)) /* size is padded to a multiple of 8 */
+#define GAP_MASK 1U
+#define SIZE_MASK (~GAP_MASK)
 
 typedef struct {
-    uint32_t size, gap;
+    uint32_t size_and_gap;
 } ringbuf_element_t;
 
 typedef struct {
@@ -54,7 +57,7 @@ static inline ringbuf_t *ringbuf_new(size_t minimum, bool release_and_acquire)
     const size_t body_size = ringbuf_body_size(minimum);
     const size_t total_size = sizeof(ringbuf_t) + body_size;
 
-    posix_memalign((void **) &ringbuf, sizeof(ringbuf_element_t), total_size);
+    posix_memalign((void **) &ringbuf, 8, total_size);
     mlock(ringbuf, total_size); /* prevent memory from being flushed */
 
     if (ringbuf)
@@ -170,19 +173,17 @@ static inline void ringbuf_write_advance(ringbuf_t *ringbuf, size_t written)
         /* fill end of first buffer with gap */
         ringbuf_element_t *element =
             (ringbuf_element_t *) (ringbuf->buf + head);
-        element->size = ringbuf->gapd - sizeof(ringbuf_element_t);
-        element->gap = 1;
+        element->size_and_gap = ringbuf->gapd - sizeof(ringbuf_element_t);
+        element->size_and_gap |= GAP_MASK;
 
         /* fill written element header */
         element = (void *) ringbuf->buf;
-        element->size = written;
-        element->gap = 0;
+        element->size_and_gap = written;
     } else {
         /* fill written element header */
         ringbuf_element_t *element =
             (ringbuf_element_t *) (ringbuf->buf + head);
-        element->size = written;
-        element->gap = 0;
+        element->size_and_gap = written;
     }
 
     /* advance write head */
@@ -226,7 +227,7 @@ static inline const void *ringbuf_read_request(ringbuf_t *ringbuf,
             const size_t len1 = ringbuf->size - tail;
             const ringbuf_element_t *element = (const ringbuf_element_t *) buf1;
 
-            if (element->gap) { /* gap element? */
+            if (element->size_and_gap & GAP_MASK) { /* gap element? */
                 /* skip gap */
                 _ringbuf_read_advance_raw(ringbuf, tail, len1);
 
@@ -235,19 +236,19 @@ static inline const void *ringbuf_read_request(ringbuf_t *ringbuf,
                 /* there will always be at least on element after a gap */
                 element = (const ringbuf_element_t *) buf2;
 
-                *toread = element->size;
+                *toread = (element->size_and_gap) & SIZE_MASK;
                 return buf2 + sizeof(ringbuf_element_t);
             }
 
             /* valid chunk, use it! */
-            *toread = element->size;
+            *toread = (element->size_and_gap) & SIZE_MASK;
             return buf1 + sizeof(ringbuf_element_t);
         }
 
         /* available buffer is contiguous */
         const uint8_t *buf = ringbuf->buf + tail;
         const ringbuf_element_t *element = (const ringbuf_element_t *) buf;
-        *toread = element->size;
+        *toread = (element->size_and_gap) & SIZE_MASK;
         return buf + sizeof(ringbuf_element_t);
     }
 
@@ -267,7 +268,9 @@ static inline void ringbuf_read_advance(ringbuf_t *ringbuf)
 
     /* advance read tail */
     _ringbuf_read_advance_raw(
-        ringbuf, tail, sizeof(ringbuf_element_t) + RINGBUF_PAD(element->size));
+        ringbuf, tail,
+        sizeof(ringbuf_element_t) +
+            RINGBUF_PAD(element->size_and_gap & SIZE_MASK));
 }
 
 /* Test program */
@@ -276,7 +279,7 @@ static const struct timespec req = {.tv_sec = 0, .tv_nsec = 1};
 
 static uint64_t iterations = 10000;
 #define THRESHOLD (RAND_MAX / 256)
-#define PAD(SIZE) (((size_t)(SIZE) + 7U) & (~7U))
+#define PAD(SIZE) (((size_t) (SIZE) + 7U) & (~7U))
 
 static void *producer_main(void *arg)
 {
