@@ -166,7 +166,7 @@ static void task_add(task_callback_t *func, void *param)
     preempt_enable();
 }
 
-static void timer_handler(int signo, siginfo_t *info, ucontext_t *ctx)
+static void timer_handler(int signo, siginfo_t *info, void *ctx)
 {
     if (preempt_count) /* once preemption is disabled */
         return;
@@ -180,7 +180,7 @@ static void timer_handler(int signo, siginfo_t *info, ucontext_t *ctx)
 static void timer_init(void)
 {
     struct sigaction sa = {
-        .sa_handler = (void (*)(int)) timer_handler,
+        .sa_sigaction = timer_handler,
         .sa_flags = SA_SIGINFO,
     };
     sigfillset(&sa.sa_mask);
